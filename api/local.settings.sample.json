@@ -1,0 +1,19 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "ConnectionStrings__Postgres": "Host=<postgres-host>;Port=5432;Database=distillforge;Username=<user>;Password=<password>",
+    "AiProvider__BaseUrl": "http://<ollama-host>:11434/v1",
+    "AiProvider__Model": "llama3.1:8b",
+    "AiProvider__ApiKey": "ollama",
+    "AiProvider__ContextTokens": "8192",
+    "AiProvider__ReserveOutput": "2048",
+    "AiProvider__SafetyMargin": "0.1",
+    "AiProvider__ResponseFormat": "JsonSchema",
+    "AiProvider__TimeoutSeconds": "300"
+  },
+  "Host": {
+    "CORS": "http://localhost:5189,https://localhost:7163"
+  }
+}

@@ -1,0 +1,21 @@
+<button type="button" class="note @(Selected ? "selected" : "")" style="--note-colour: @Colour" @onclick="OnClick" title="@Item.Summary">
+    <span class="note-title">@Item.Title</span>
+    @if (!string.IsNullOrEmpty(Item.Owner) || !string.IsNullOrEmpty(Item.Due))
+    {
+        <span class="note-meta">
+            @if (!string.IsNullOrEmpty(Item.Owner)) { <span>@Item.Owner</span> }
+            @if (!string.IsNullOrEmpty(Item.Due)) { <span>· @Item.Due</span> }
+        </span>
+    }
+    @if (Item.Evidence.Any(e => e.MatchQuality == MatchQuality.Segment))
+    {
+        <span class="note-flag" title="Some evidence couldn't be matched exactly">low confidence</span>
+    }
+</button>
+
+@code {
+    [Parameter, EditorRequired] public ActionItemDto Item { get; set; } = default!;
+    [Parameter] public bool Selected { get; set; }
+    [Parameter] public string Colour { get; set; } = "#ff8a8d";
+    [Parameter] public EventCallback OnClick { get; set; }
+}

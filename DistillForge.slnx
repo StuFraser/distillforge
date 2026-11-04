@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/api/">
+    <Project Path="api/DistillForge.Api.csproj" />
+  </Folder>
+  <Folder Name="/blazor/">
+    <Project Path="blazor/DistillForge.Blazor.csproj" />
+  </Folder>
+  <Folder Name="/core/">
+    <Project Path="core/DistillForge.Core.csproj" />
+  </Folder>
+  <Folder Name="/data/">
+    <Project Path="data/DistillForge.Data.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DistillForge.Core.Tests/DistillForge.Core.Tests.csproj" />
+  </Folder>
+</Solution>

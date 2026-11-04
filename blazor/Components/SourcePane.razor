@@ -1,0 +1,33 @@
+@* Read-only source viewer. Text is split into runs around highlight ranges; offsets are against the canonical source. *@
+<div class="source-text" id="@ContainerId">
+    @foreach (var run in _runs)
+    {
+        var text = Text.Substring(run.Start, run.End - run.Start);
+        if (run.Highlight is { } q)
+        {
+            <mark class="hl hl-@q.ToString().ToLowerInvariant()" title="@(q == MatchQuality.Segment ? "Low confidence: quote not found, whole segment shown" : null)">@text</mark>
+        }
+        else
+        {
+            @text
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    [Parameter] public IReadOnlyList<HighlightRange> Highlights { get; set; } = [];
+    [Parameter] public string ContainerId { get; set; } = "source-text";
+
+    private IReadOnlyList<TextRun> _runs = [];
+    private string? _lastText;
+    private IReadOnlyList<HighlightRange>? _lastHighlights;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_lastText, Text) && ReferenceEquals(_lastHighlights, Highlights)) return;
+        _lastText = Text;
+        _lastHighlights = Highlights;
+        _runs = TextRunBuilder.Build(Text.Length, Highlights);
+    }
+}

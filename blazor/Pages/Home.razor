@@ -1,0 +1,196 @@
+@page "/"
+@implements IDisposable
+@inject DistillForgeApi Api
+@inject IJSRuntime JS
+
+<PageTitle>DistillForge</PageTitle>
+
+@if (_error is not null)
+{
+    <div class="banner-error" role="alert">
+        <span>@_error</span>
+        <button type="button" class="link" @onclick="() => _error = null">Dismiss</button>
+    </div>
+}
+
+<div class="workspace">
+    <section class="panel source-panel" aria-label="Source">
+        <header class="panel-header">
+            <h2>@(_workspace?.Title ?? "Source")</h2>
+            @if (_workspace is not null)
+            {
+                <span class="muted">@_workspace.Strategy · @_workspace.Segments.Count segments</span>
+            }
+        </header>
+
+        @if (_loading)
+        {
+            <p class="muted pad">Loading…</p>
+        }
+        else if (_workspace is null)
+        {
+            <p class="muted pad">No source yet. Add a document to extract action points.</p>
+        }
+        else
+        {
+            <SourcePane Text="_workspace.SourceText" Highlights="_highlights" />
+        }
+
+        <footer class="panel-footer">
+            <button type="button" class="add-source" @onclick="() => _showDialog = true" disabled="@IsExtracting">Add Source</button>
+            @if (_workspace is not null)
+            {
+                <button type="button" class="secondary" @onclick="StartExtraction" disabled="@IsExtracting">Re-extract</button>
+            }
+        </footer>
+    </section>
+
+    <div class="right-column">
+        <section class="panel notes-panel" aria-label="Uncategorised action items">
+            <header class="panel-header">
+                <h2>Uncategorised</h2>
+                @if (IsExtracting)
+                {
+                    <span class="status running">Extracting… @(_run?.Status == ExtractionRunStatus.Queued ? "(queued)" : "")</span>
+                }
+                else if (_run?.Status == ExtractionRunStatus.Failed)
+                {
+                    <span class="status failed" title="@_run.Error">Extraction failed: @_run.Error</span>
+                }
+                else if (_run?.Status == ExtractionRunStatus.Succeeded)
+                {
+                    <span class="status ok" title="@_run.Warnings">
+                        @_run.ActionItemCount found@(_run.PromptTokens is int p ? $" · {p:N0} prompt tokens" : "")@(string.IsNullOrEmpty(_run.Warnings) ? "" : " · warnings")
+                    </span>
+                }
+            </header>
+            <div class="notes-grid">
+                @foreach (var item in _actions.Where(a => a.CategoryId is null))
+                {
+                    <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" />
+                }
+                @if (!IsExtracting && _workspace is not null && _actions.Count == 0)
+                {
+                    <p class="muted">No action items yet.</p>
+                }
+            </div>
+        </section>
+
+        <section class="panel categories-panel" aria-label="Categories">
+            <nav class="category-tabs" aria-label="Categories">
+                <span class="tab placeholder">Categories coming soon</span>
+            </nav>
+            <div class="notes-grid"></div>
+        </section>
+    </div>
+</div>
+
+@if (_showDialog)
+{
+    <AddSourceDialog IsReplace="_workspace is not null" Busy="_saving" OnSubmit="SubmitSource" OnCancel="() => _showDialog = false" />
+}
+
+@code {
+    private WorkspaceDto? _workspace;
+    private List<ActionItemDto> _actions = [];
+    private ExtractionRunDto? _run;
+    private Guid? _selectedId;
+    private IReadOnlyList<HighlightRange> _highlights = [];
+    private bool _loading = true, _saving, _showDialog, _scrollPending;
+    private string? _error;
+    private readonly CancellationTokenSource _cts = new();
+
+    private bool IsExtracting => _run?.Status is ExtractionRunStatus.Queued or ExtractionRunStatus.Running;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var list = await Api.ListWorkspacesAsync(_cts.Token);
+            if (list.Count > 0) await LoadWorkspace(list[0].Id);
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task LoadWorkspace(Guid id)
+    {
+        _workspace = await Api.GetWorkspaceAsync(id, _cts.Token);
+        _actions = _workspace is null ? [] : await Api.GetActionsAsync(id, _cts.Token);
+        ClearSelection();
+    }
+
+    private async Task SubmitSource((string Text, SegmentationStrategyKind? Strategy) input)
+    {
+        _saving = true;
+        try
+        {
+            _workspace = _workspace is null
+                ? await Api.CreateWorkspaceAsync(new CreateWorkspaceRequest(input.Text, null, input.Strategy), _cts.Token)
+                : await Api.ReplaceSourceAsync(_workspace.Id, new ReplaceSourceRequest(input.Text, input.Strategy), _cts.Token);
+            _actions = [];
+            _run = null;
+            ClearSelection();
+            _showDialog = false;
+        }
+        catch (ApiException ex) { _error = ex.Message; return; }
+        finally { _saving = false; }
+
+        await StartExtraction();
+    }
+
+    private async Task StartExtraction()
+    {
+        if (_workspace is null) return;
+        try
+        {
+            _run = await Api.StartExtractionAsync(_workspace.Id, _cts.Token);
+            StateHasChanged();
+            await PollRun();
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task PollRun()
+    {
+        while (IsExtracting && !_cts.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2), _cts.Token);
+            _run = await Api.GetRunAsync(_run!.Id, _cts.Token);
+            StateHasChanged();
+        }
+        if (_run?.Status == ExtractionRunStatus.Succeeded && _workspace is not null)
+        {
+            _actions = await Api.GetActionsAsync(_workspace.Id, _cts.Token);
+            ClearSelection();
+        }
+    }
+
+    private void Select(ActionItemDto item)
+    {
+        if (_selectedId == item.Id) { ClearSelection(); return; }
+        _selectedId = item.Id;
+        _highlights = item.Evidence.Select(e => new HighlightRange(e.Start, e.End, e.MatchQuality)).ToList();
+        _scrollPending = true;
+    }
+
+    private void ClearSelection()
+    {
+        _selectedId = null;
+        _highlights = [];
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_scrollPending) return;
+        _scrollPending = false;
+        await JS.InvokeVoidAsync("distillforge.scrollToFirstHighlight", "source-text");
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}

@@ -1,0 +1,51 @@
+<div class="dialog-backdrop" @onclick="Cancel">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="add-source-title" @onclick:stopPropagation="true">
+        <h2 id="add-source-title">@(IsReplace ? "Replace source" : "Add source")</h2>
+
+        @if (IsReplace)
+        {
+            <p class="warning">
+                Replacing the source overwrites the entire workspace, including categories,
+                action item notes and previous extraction results.
+            </p>
+        }
+
+        <label for="source-input">Paste text</label>
+        <textarea id="source-input" rows="16" @bind="_text" @bind:event="oninput" placeholder="Paste a meeting transcript, plan, contract…"></textarea>
+
+        <div class="dialog-row">
+            <label for="strategy">Document type</label>
+            <select id="strategy" @bind="_strategy">
+                <option value="">Auto-detect</option>
+                <option value="Prose">Prose / plan</option>
+                <option value="Transcript">Meeting transcript</option>
+            </select>
+            <span class="muted">@_text.Length.ToString("N0") chars</span>
+        </div>
+
+        <div class="dialog-actions">
+            <button type="button" class="secondary" @onclick="Cancel" disabled="@Busy">Cancel</button>
+            <button type="button" class="primary" @onclick="Submit" disabled="@(Busy || string.IsNullOrWhiteSpace(_text))">
+                @(IsReplace ? "Replace and extract" : "Add and extract")
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsReplace { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback<(string Text, SegmentationStrategyKind? Strategy)> OnSubmit { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string _text = "";
+    private string _strategy = "";
+
+    private Task Submit()
+    {
+        SegmentationStrategyKind? strategy = Enum.TryParse<SegmentationStrategyKind>(_strategy, out var s) ? s : null;
+        return OnSubmit.InvokeAsync((_text, strategy));
+    }
+
+    private Task Cancel() => Busy ? Task.CompletedTask : OnCancel.InvokeAsync();
+}

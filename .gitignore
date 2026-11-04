@@ -1,1 +1,17 @@
 /design-notes
+
+# Build output
+bin/
+obj/
+*.user
+.vs/
+.idea/
+
+# Functions local settings (secrets) – copy api/local.settings.sample.json
+local.settings.json
+
+# Azurite local storage
+__azurite_db_*.json
+__blobstorage__/
+__queuestorage__/
+.azurite/

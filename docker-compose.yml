@@ -1,0 +1,25 @@
+# Optional local dependencies. Postgres can equally live on another LAN machine;
+# just point ConnectionStrings__Postgres at it. Azurite backs the extraction queue
+# (AzureWebJobsStorage=UseDevelopmentStorage=true); `npx azurite` works too.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: distillforge
+      POSTGRES_USER: distillforge
+      POSTGRES_PASSWORD: distillforge-dev   # dev only
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+
+volumes:
+  pgdata:
