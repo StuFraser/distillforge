@@ -1,0 +1,257 @@
+REQUEST FOR PROPOSAL
+Warehouse Management System — Replacement and Implementation
+
+Issued by Meridian Home & Garden Distribution Ltd
+RFP reference MHG-IT-2026-014
+Issue date 2 November 2026
+Response deadline 12:00 GMT, Friday 4 December 2026
+
+1. INTRODUCTION
+
+Meridian Home & Garden Distribution Ltd ("Meridian") invites suitably experienced suppliers to submit a proposal for the supply, configuration, implementation and ongoing support of a cloud-hosted Warehouse Management System (WMS) to replace our current on-premise system across three distribution centres.
+
+This document sets out our background, the scope of the engagement, our functional and non-functional requirements, and the format in which we would like to receive your response. We are particularly keen to receive estimates broken down at functional area level, as described in section 7, so that we can compare proposals on a like-for-like basis and phase the implementation if needed.
+
+All questions about this RFP should be submitted in writing to the procurement contact in section 9 no later than Friday 20 November 2026. Questions and answers will be anonymised and shared with all invited suppliers by Wednesday 25 November.
+
+2. ABOUT MERIDIAN
+
+Meridian is a privately owned distributor of garden, outdoor living and home improvement products, supplying around 1,400 independent garden centres and hardware stores in the UK and Ireland, plus two national retail chains. We also fulfil direct-to-consumer web orders on behalf of four of our brand partners.
+
+We operate from three sites. Our main DC in Northampton (310,000 sq ft, ambient, narrow-aisle racking plus bulk floor storage), a seasonal overflow site in Daventry (120,000 sq ft, block-stacked, open February to July), and a smaller site in Dublin (65,000 sq ft) that serves our Irish customers.
+
+We hold around 22,000 active SKUs, rising to about 26,000 at seasonal peak. Volumes are highly seasonal, with roughly 45 percent of annual throughput between March and June. At peak we receive up to 180 inbound loads per week, including around 40 containers, and despatch up to 9,000 order lines per day for trade customers and 3,500 parcels per day for web orders.
+
+Our ERP is Microsoft Dynamics 365 Business Central, which will remain the system of record for finance, purchasing and sales orders. We use a third-party transport management system (TMS) for trade deliveries and a carrier management platform for parcels.
+
+3. BACKGROUND AND OBJECTIVES
+
+Our current WMS was implemented in 2012 and is no longer supported by its vendor beyond December 2027. It is heavily customised, runs on ageing on-premise servers, and its handheld application only runs on terminals that are now end of life. We also rely on a large number of spreadsheets and manual workarounds, particularly for seasonal operations, replenishment and stocktaking.
+
+The objectives of this programme are to replace the current WMS before support ends, with no disruption to the March to June peak; to increase inventory accuracy at location level from around 95 percent to at least 99 percent; to increase picking productivity by at least 15 percent through better task interleaving and pick path optimisation; to remove the annual wall-to-wall stocktake in favour of perpetual cycle counting; to support growth in direct-to-consumer volumes without a separate system; and to reduce dependency on manual spreadsheets and on individual staff knowledge.
+
+4. SCOPE
+
+The scope of this RFP covers software licensing or subscription, solution design, configuration, integration with Business Central and our TMS and carrier platform, data migration, testing support, training, go-live support and ongoing support and maintenance for an initial term of five years.
+
+Hardware (handheld terminals, printers, wireless infrastructure) is out of scope for pricing, but we expect suppliers to specify supported devices and minimum infrastructure requirements. Suppliers may optionally quote for hardware as a separate item.
+
+Our preferred phasing is Northampton first, with go-live no later than October 2027, followed by Dublin and then Daventry before its February 2028 seasonal opening. We are open to alternative phasing proposals if suppliers believe they would reduce risk.
+
+5. FUNCTIONAL REQUIREMENTS
+
+Requirements are grouped by functional area. Each requirement has a priority. M means Must have, and a proposal that cannot meet it is likely to be excluded. S means Should have, which is important and will be weighted in scoring. C means Could have, which is desirable but not essential.
+
+For each requirement, please state whether it is met by standard functionality, met by configuration, met by customisation or development, met by a third-party product, or not met. Please keep your response to the reference numbers used below.
+
+5.1 Inbound and Receiving
+
+REC-01 (M) Receive against purchase orders imported from Business Central, at line level, with support for partial receipts and multiple receipts per PO line.
+
+REC-02 (M) Receive against advance shipping notices (ASNs) received via EDI, including scanning of SSCC pallet labels to confirm whole pallets without line-level counting.
+
+REC-03 (S) Provide a supplier portal or equivalent for suppliers without EDI to submit ASNs and print compliant SSCC labels.
+
+REC-04 (S) Dock appointment scheduling, allowing suppliers and hauliers to book delivery slots, with configurable dock capacity by day and time.
+
+REC-05 (M) Configurable over and under receipt tolerances per supplier and per item, with supervisor approval for receipts outside tolerance.
+
+REC-06 (M) Container unloading with support for mixed-SKU, loose-loaded containers, including capture of carton counts and generation of licence plate numbers at receipt.
+
+REC-07 (S) Automatic routing of receipts to quality inspection hold based on item, supplier or random sampling rules, with release and rejection workflow.
+
+REC-08 (S) Opportunistic cross-docking, where received stock is directed to despatch if it is required for an open order due within a configurable time window.
+
+REC-09 (M) Real-time posting of receipts to Business Central, including partial receipts, to support three-way matching.
+
+5.2 Putaway and Storage
+
+PUT-01 (M) System-directed putaway based on configurable rules including item dimensions, weight, velocity, product family, hazardous classification and location capacity.
+
+PUT-02 (M) Support for multiple storage types including narrow-aisle racking, pallet racking, shelving, block-stack floor locations and line-side/pick-face locations.
+
+PUT-03 (S) Putaway to seasonal overflow locations with automatic consolidation suggestions when seasonal stock falls below a configurable threshold.
+
+PUT-04 (M) Segregation of hazardous goods (fertilisers, pesticides, aerosols, lithium batteries) according to configurable compatibility rules.
+
+PUT-05 (C) Slotting optimisation recommendations based on historical pick velocity and seasonality, with a re-slotting task workflow.
+
+5.3 Inventory Management
+
+INV-01 (M) Real-time inventory by location, licence plate, lot/batch and expiry date, with configurable inventory statuses such as available, quarantine, damaged and reserved.
+
+INV-02 (M) Lot and expiry tracking for chemical and seed products, with FEFO allocation where configured.
+
+INV-03 (M) Full audit trail of all inventory movements and adjustments, including user, device, timestamp and reason code.
+
+INV-04 (S) Support for multiple units of measure per item (each, inner, case, pallet) with conversion at all handheld transactions.
+
+INV-05 (S) Stock ownership to support consignment stock held on behalf of brand partners, kept separate in reporting and billing.
+
+INV-06 (M) Inter-site transfers between Northampton, Daventry and Dublin, with in-transit visibility.
+
+5.4 Stocktaking and Cycle Counting
+
+CNT-01 (M) Perpetual cycle counting with count frequencies driven by ABC classification, calculated by the system and overridable per SKU.
+
+CNT-02 (M) Blind counting on handhelds, with lot/expiry capture and unit of measure conversion.
+
+CNT-03 (M) Exception-triggered counts, for example on short picks, zero-stock confirmations or negative inventory.
+
+CNT-04 (M) Configurable variance tolerances by ABC class, with automatic recount by a different user and multi-level approval based on value.
+
+CNT-05 (S) Counting without freezing locations, using a snapshot method that accounts for movements during the count.
+
+CNT-06 (S) Count calendar with blackout dates, for example month end and bank holidays.
+
+CNT-07 (M) Posting of approved adjustments to Business Central as inventory journals, with mandatory reason codes.
+
+CNT-08 (C) Support for a full wall-to-wall stocktake as a fallback, including location freezing and count sheet generation.
+
+5.5 Replenishment
+
+REP-01 (M) Min/max and demand-driven replenishment of pick faces from reserve storage, with priority escalation when a pick is waiting.
+
+REP-02 (S) Wave-based top-up replenishment ahead of planned pick waves.
+
+REP-03 (S) Seasonal replenishment planning, allowing pick face sizes and min/max levels to change by date range.
+
+REP-04 (C) Reorder point suggestions to Business Central purchasing, based on warehouse stock and forward demand.
+
+5.6 Order Processing, Picking and Packing
+
+PCK-01 (M) Import of trade and web orders from Business Central, with support for order priorities, delivery dates, routes and carrier cut-off times.
+
+PCK-02 (M) Wave, batch, cluster and zone picking strategies, configurable by order type and site.
+
+PCK-03 (M) Pick path optimisation for narrow-aisle and standard racking.
+
+PCK-04 (S) Task interleaving across putaway, replenishment, picking and counting to reduce empty travel.
+
+PCK-05 (M) Pick-to-tote and pick-to-pallet with licence plate tracking through to despatch.
+
+PCK-06 (S) Pack station workflow for web orders with carton size recommendation, packing verification by scan and printing of carrier labels via our carrier management platform.
+
+PCK-07 (C) Support for voice picking as an alternative to handheld scanning in the bulk area.
+
+PCK-08 (M) Short pick handling with automatic re-allocation from alternative locations where available.
+
+5.7 Despatch and Loading
+
+DSP-01 (M) Load planning and marshalling by route and vehicle, using routes from our TMS.
+
+DSP-02 (M) Scan-to-load verification, preventing loading of pallets onto the wrong vehicle.
+
+DSP-03 (M) Generation of delivery notes, pallet labels and despatch confirmations to Business Central and the TMS.
+
+DSP-04 (S) Export documentation for Republic of Ireland shipments, including customs data required post-Brexit.
+
+5.8 Returns
+
+RET-01 (M) Customer returns receiving against return authorisations from Business Central, with inspection and grading (restock, refurbish, scrap, return to supplier).
+
+RET-02 (S) Return to supplier workflow, including generation of supplier return documents.
+
+RET-03 (C) Web returns processing on behalf of brand partners, with partner-specific grading rules.
+
+5.9 Value-Added Services and Billing
+
+VAS-01 (S) Kitting and simple assembly, for example creating gift sets and seasonal display bundles from component stock.
+
+VAS-02 (S) Activity-based billing for brand partners whose stock we hold, covering storage, handling and VAS activities.
+
+5.10 Labour Management
+
+LAB-01 (S) Capture of productivity by user and activity, with engineered or configurable standards.
+
+LAB-02 (S) Shift and workload planning views, showing outstanding work by area against available labour.
+
+LAB-03 (C) Support for agency staff with temporary logins and simplified training mode.
+
+5.11 Reporting and Analytics
+
+RPT-01 (M) Standard operational reports and dashboards covering inbound, inventory, picking, despatch and returns.
+
+RPT-02 (M) Inventory accuracy reporting by site, zone and ABC class.
+
+RPT-03 (S) Self-service report building for business users without developer involvement.
+
+RPT-04 (S) Export of data to our Power BI environment, either via an API, data feed or direct database access.
+
+5.12 Integration
+
+INT-01 (M) Bi-directional integration with Microsoft Dynamics 365 Business Central covering items, suppliers, customers, purchase orders, sales orders, receipts, shipments, transfers, returns and inventory adjustments.
+
+INT-02 (M) Integration with our TMS for route and load data.
+
+INT-03 (M) Integration with our carrier management platform for parcel labels and tracking.
+
+INT-04 (S) EDI capability for ASNs and despatch advices, either natively or via a supported third-party EDI provider.
+
+INT-05 (S) Documented REST APIs for future integrations, including webhooks or event notifications.
+
+5.13 Users, Security and Administration
+
+ADM-01 (M) Role-based access control with configurable roles and permissions, including approval limits.
+
+ADM-02 (M) Single sign-on with Microsoft Entra ID.
+
+ADM-03 (M) Multi-site configuration from a single tenant, with site-specific rules and shared master data.
+
+ADM-04 (S) Configuration changes such as putaway rules and replenishment parameters made by trained super users without supplier involvement.
+
+5.14 Data Migration
+
+MIG-01 (M) Migration of item master, location master and opening stock balances by location, lot and licence plate.
+
+MIG-02 (S) Migration of 24 months of transaction history for reporting purposes, or an alternative proposal for historical reporting.
+
+6. NON-FUNCTIONAL REQUIREMENTS
+
+NFR-01 (M) The solution must be cloud hosted, with data held in the UK or EU.
+
+NFR-02 (M) Availability of at least 99.9 percent during our operating hours of 05:00 to 23:00, Monday to Saturday, with planned maintenance outside these hours.
+
+NFR-03 (M) Handheld transaction response times of under one second for 95 percent of transactions at peak volumes.
+
+NFR-04 (S) Handheld application able to operate during short wireless outages, queuing transactions and synchronising automatically.
+
+NFR-05 (M) Compliance with UK GDPR, with a data processing agreement provided.
+
+NFR-06 (M) Independent security certification, such as ISO 27001 or SOC 2 Type II, with evidence provided.
+
+NFR-07 (M) Disaster recovery with a recovery point objective of no more than 15 minutes and a recovery time objective of no more than 4 hours.
+
+NFR-08 (S) Support for Android-based handheld terminals from at least two major manufacturers.
+
+NFR-09 (M) UK-based or UK-hours support, with 24/7 cover for priority 1 incidents during our peak season.
+
+7. ESTIMATES AND PRICING RESPONSE
+
+We are asking for estimates at functional level. For each of the functional areas listed in section 5 (Inbound and Receiving, Putaway and Storage, Inventory Management, Stocktaking and Cycle Counting, Replenishment, Order Processing Picking and Packing, Despatch and Loading, Returns, Value-Added Services and Billing, Labour Management, Reporting and Analytics, Integration, Users Security and Administration, and Data Migration), please provide the estimated effort in days for design, configuration, development, testing support and training, together with the day rates applied and the total cost.
+
+Please identify separately any requirements within each functional area that need customisation or development, with an individual estimate for each, so that we can decide whether to include them in phase one, defer them or drop them.
+
+Please also provide project-level costs that sit outside the functional areas, including project management, solution architecture, environments, go-live support (we expect at least two weeks of on-site hypercare at Northampton), and the incremental cost of rolling out to Dublin and Daventry once Northampton is live.
+
+Recurring costs should be shown per year for five years, including subscription or licence fees, support and maintenance, and any usage-based charges. Please state the pricing metric used (for example per user, per site, per transaction or per order line) and how costs would change if our volumes grew by 25 percent.
+
+Please state all assumptions on which your estimates are based, including the level of Meridian resource you expect to be available, and identify any dependencies on Meridian or third parties. Where a requirement is out of scope or not met, please say so explicitly rather than leaving it blank.
+
+We understand that estimates at this stage are indicative. However, we expect suppliers shortlisted for the next stage to confirm their estimates within plus or minus 15 percent following a discovery workshop.
+
+8. RESPONSE FORMAT AND EVALUATION
+
+Responses should include an executive summary of no more than two pages; a completed requirements compliance response using the reference numbers in sections 5 and 6; the functional level estimates and pricing as described in section 7; an implementation approach and high-level plan aligned to our preferred phasing; a description of your proposed project team, with CVs for key roles; at least two references from customers in distribution or wholesale, ideally using Business Central; and your standard contract terms and service level agreement.
+
+Proposals will be evaluated on functional fit (35 percent), implementation approach and risk (20 percent), total cost of ownership over five years (25 percent), supplier capability and references (15 percent), and the quality of the response itself (5 percent).
+
+Shortlisted suppliers will be invited to give a scripted demonstration at our Northampton site in the week commencing 11 January 2027. We will provide demonstration scripts at least two weeks in advance. We intend to select a preferred supplier by the end of February 2027 and begin discovery in March 2027.
+
+9. CONTACT AND SUBMISSION
+
+Please send responses electronically, in PDF format with the pricing in an editable spreadsheet, to Laura Kemp, Procurement Manager, at procurement@meridian-hg.example, quoting reference MHG-IT-2026-014 in the subject line. Late responses may not be considered.
+
+Suppliers must not contact other Meridian staff about this RFP during the procurement process. Site visits before the response deadline can be arranged on request through the procurement contact, and must be requested by Friday 13 November 2026.
+
+This RFP does not commit Meridian to award a contract. All information in this document is confidential and provided solely for the purpose of preparing a response.

@@ -1,0 +1,60 @@
+From: Marcus Byrne <marcus.byrne@northfield-components.example>
+To: Priya Nair <priya.nair@stockline.example>
+Cc: Helen Shaw <helen.shaw@northfield-components.example>; Owen Price <owen.price@northfield-components.example>
+Subject: New goods-in process + update on JIT ordering and manufacturing demand
+Date: Tue, 3 Nov 2026 16:42
+
+Hi Priya,
+
+Hope you're well, and thanks again for sorting the label printer issue at Telford last month. That's been rock solid since.
+
+I'm writing about two things. First, we need to rework how we receive stock, and I'd like Stockline's help to design and configure a new receipt process. Second, I'm after an update on the JIT ordering and manufacturing demand features we raised over the summer. I know we've discussed both with other people on your side, and I'm struggling to get a clear picture of where they've landed, so I'd appreciate it if you could pull it together for us.
+
+1. NEW STOCK RECEIPT PROCESS
+
+Our current goods-in process was designed when we had around forty suppliers. We're now at about a hundred and thirty, and from January we're bringing in two new contract manufacturers in Poland and Vietnam. Goods-in is the bottleneck. We regularly have trailers waiting over two hours to tip, and our receiving accuracy has dropped to around ninety-four percent, mostly quantity errors and items booked to the wrong PO line.
+
+What we'd like the new process to look like is roughly as follows. Please treat this as a starting point rather than a spec, as Helen and her team will want to work through the detail with you.
+
+Advance shipping notices. We want our larger suppliers to send ASNs, either via EDI or uploaded through a supplier portal, so that the inbound is already expected at line level before the truck arrives. Receiving should then be a case of scanning the SSCC on each pallet and confirming, rather than counting everything from scratch. For suppliers who can't send ASNs we'll keep receiving against the PO, but the handheld flow needs to be the same as far as possible.
+
+Dock scheduling. Suppliers or hauliers should be able to book a dock slot, and the goods-in team should see a daily schedule of what's arriving and when. Owen has been asking for this for a long time.
+
+Over and under receipts. At the moment the system lets anyone receive any quantity. We want configurable tolerances per supplier, with anything outside tolerance held for a supervisor to approve. Partial receipts must leave the PO line open, and we need a way to close a line short when the supplier confirms the balance won't be sent.
+
+Quality inspection. Certain parts, mostly the precision machined items and anything for our aerospace customers, need to be inspected before they can be put away. These should go to a QC hold location automatically based on the item or supplier, and stay unavailable for allocation until QC releases them. If they fail inspection we need to raise a supplier return from the same screen.
+
+Cross-docking. Some inbound lines are already allocated to urgent customer orders or to a works order on the shop floor. Where that's the case, the receiver should be told at the point of receipt to send it straight to despatch or to the production line, rather than putting it away and picking it again an hour later.
+
+Labelling and putaway. We'd like the system to print an internal licence plate label at receipt and suggest a putaway location based on the item's storage rules, rather than relying on operators' knowledge.
+
+Business Central. Receipts need to post back to the PO in Business Central in near real time, including partial receipts, so that accounts payable can do three-way matching. Today there's a delay of up to a day, which causes problems at month end.
+
+Timing-wise, we'd ideally like the new process in place before the Poland and Vietnam volumes start ramping up, which is the beginning of March. Could you let me know whether that's realistic, what you'd need from us, and whether any of this needs a change request or additional licences? A rough plan by the end of the month would be really helpful, as I need to include it in our Q1 budget submission on the 4th of December.
+
+2. JIT ORDERING AND MANUFACTURING DEMAND
+
+Back in July, Owen and I met with Ellie Grant from your product team to talk about JIT replenishment for the line-side stores. The idea was that kanban signals, either from bin scans or from minimum levels in the line-side locations, would automatically generate either an internal replenishment from the main warehouse or, for supplier-managed items, a call-off against a blanket PO. Ellie said this was being looked at for the autumn release and that she'd come back to us with a design for review. We haven't heard anything since, and I noticed it wasn't in the release notes for 26.3. Can you find out where it's got to? If it's been deprioritised, I'd rather know now so we can plan around it.
+
+Separately, in August Helen had a couple of sessions with Raj Patel on your solutions side about manufacturing demand. At the moment Stockline only sees sales orders as demand, so our replenishment and reorder points ignore what production will need. Raj suggested we could feed the production schedule from Business Central into Stockline, explode the bill of materials for each works order and create component demand by date, which would then drive both replenishment and purchasing suggestions. Helen sent Raj a sample BOM export and a three-month production schedule on the 28th of August. Raj mentioned there might be a lighter option using a nightly file rather than a live integration, and that he'd send a short proposal with options and costs. Again, we haven't had anything back.
+
+To be clear, I'm not complaining about either Ellie or Raj, both were really helpful in the sessions. I suspect things have just fallen between teams. But both of these matter more now than they did in the summer, because the contract manufacturers will mean we're holding more component stock line-side, and getting the demand picture wrong will either stop the lines or tie up a lot of cash.
+
+So what I'd really appreciate is:
+
+- A status update on JIT/kanban replenishment, including whether it's still on the roadmap and a likely release.
+- Raj's proposal for manufacturing demand, or at least a view on the nightly file option versus a live integration and the indicative cost of each.
+- Some thought about how both of these fit with the new receipt process. For example, if a component is received and there's a kanban signal or a works order waiting for it, I assume that's where the cross-docking would come in, so it would be good to design these together rather than separately.
+- A suggested date for a working session with Helen, Owen and me, plus whoever you need from your side. Ideally the week of the 16th of November, and we're happy to host at Telford.
+
+I'm also conscious our renewal comes up in April. I'd like to go into that conversation with a clear view of what's been delivered and what's coming, so getting answers on these would help me make the case internally.
+
+Thanks Priya, I know this is a lot in one email. Give me a call if it's easier to talk it through. I'm in the office all of Thursday.
+
+Kind regards,
+
+Marcus Byrne
+Supply Chain Director
+Northfield Components Ltd
+Telford, Shropshire
++44 1952 000 000

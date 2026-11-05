@@ -1,0 +1,102 @@
+[00:00:04] Priya Nair: Morning all, thanks for making the time. Can everyone hear me okay? Tom, I can see you, Grace and Dan are you both on?
+[00:00:11] Tom Reeves: Yep, we're all here in the meeting room at Avonmouth. Dan's just come off the floor so he might need a coffee first.
+[00:00:17] Dan Whitfield: I'm fine, I'm fine. Go for it.
+[00:00:20] Priya Nair: Great. So for the notes, this is the Stockline and Harbour & Vale call on the stocktaking feature. I'm Priya, Client Success Manager. We've got Tom as our primary user and system owner, Grace from inventory control and Dan from shift supervision. The aim today is to walk through what you need from the new cycle counting module and agree what goes into the first release. I've got about fifteen minutes before my next call, so I'll keep us moving.
+[00:00:42] Tom Reeves: Perfect. Just to set the scene, we're still doing a full wall-to-wall count twice a year. It shuts both sites for a weekend, costs us roughly eighteen grand in overtime and agency labour each time, and the auditors still pick holes in it. We want to move to perpetual cycle counting so we can drop at least one of those full counts next year.
+[00:01:05] Priya Nair: Understood. And what's the timeline pressure? Is there a date you're working back from?
+[00:01:10] Tom Reeves: Year end is the end of March. The finance director wants to tell the auditors in January that we've got a cycle counting process running, ideally with at least six weeks of data behind it. So realistically we need something live at Avonmouth by mid-January at the latest.
+[00:01:26] Priya Nair: Okay, that's tight but not crazy. Let me note that as a hard date. Grace, do you want to talk through how you'd like counts to be generated?
+[00:01:34] Grace Okafor: Sure. So the big thing for me is ABC classification. Our A items, which is about twelve percent of SKUs but nearly seventy percent of value, I want counted monthly. B items quarterly, C items twice a year. At the moment I do that in a spreadsheet and it's a nightmare to keep up to date.
+[00:01:52] Priya Nair: Does the classification need to be calculated by the system, or will you maintain it yourselves?
+[00:01:57] Grace Okafor: Ideally the system calculates it from twelve months of usage value, but I need to be able to override individual SKUs. We've got some low value items that are high theft risk, like the branded power tools accessories, and I want those treated as A regardless.
+[00:02:12] Priya Nair: That makes sense. We do have ABC calculation in the analytics module already, so I think it's mostly about feeding it into the count scheduler. I'll check with product whether the override is per SKU or per category today. I'll come back to you on that by Friday.
+[00:02:26] Grace Okafor: Thanks. The other trigger I want is exception-based counts. So if a picker goes to a location and it's empty but the system says there's stock, that should automatically raise a count on that location.
+[00:02:38] Dan Whitfield: That happens loads on nights. The lads short pick, they flag it on the handheld, and then nothing happens until someone remembers to check it. Half the time it's sitting in the overflow location two bays down.
+[00:02:50] Priya Nair: So a short pick or a zero-stock confirmation should generate a count task. Should that count task go to the same picker or to a dedicated counter?
+[00:02:58] Dan Whitfield: Not the same picker, no. I'd want it in a separate count queue that I can assign. On nights I've usually got one person I can pull off picking for an hour or two to clear counts.
+[00:03:08] Tom Reeves: And it needs to be prioritised. If the location has open orders against it, that count should jump to the top.
+[00:03:14] Priya Nair: Good, so priority based on open demand against the location. I'm writing that down. Dan, while you're on, talk me through what the counter actually does on the handheld.
+[00:03:22] Dan Whitfield: Right, so the main thing is it has to be a blind count. If the screen shows them the expected quantity, they'll just type in what it says. I've seen it happen. So scan the location, scan the product, key the quantity, no expected figure shown.
+[00:03:36] Priya Nair: Blind count by default. Do you ever want it not blind? Like for supervisors?
+[00:03:41] Dan Whitfield: Supervisors, maybe, for a recount. But the first count always blind.
+[00:03:46] Grace Okafor: And it has to handle lot and expiry. About a third of our range is batch tracked, the adhesives and sealants mostly. If they count twenty tubes but it's actually two batches, I need to know which is which.
+[00:03:58] Priya Nair: So capture lot and expiry at count time for batch-tracked items. Our handheld app already does that on receipt, so we can probably reuse the same screen. I'll get our solutions architect, Raj, to confirm it works in the count flow.
+[00:04:10] Dan Whitfield: The other thing, and this is a big one for me, is units of measure. We've got stuff that's received in cases of twenty-four but picked in eaches. If someone counts three cases and four loose, they shouldn't have to do mental arithmetic at four in the morning.
+[00:04:24] Priya Nair: Yes, I've heard that from a couple of other customers. Let them enter cases and eaches separately and the app converts. I think that's on the roadmap already but I'm not sure of the status. Let me find out.
+[00:04:35] Tom Reeves: Can I jump in on connectivity? The back half of the Avonmouth warehouse, the mezzanine and the cold store, has terrible Wi-Fi. We're getting new access points but not until February. So the counters need to be able to work offline and sync when they come back into coverage.
+[00:04:50] Priya Nair: Okay, that's an important one. Offline isn't something the current handheld app does well, to be honest. It can queue scans for a minute or two but not a whole count session. I don't want to promise that for January. Could you live with paper count sheets for the mezzanine until the access points go in?
+[00:05:06] Tom Reeves: I'd rather not, but if it's the difference between going live in January or not, then yes, we could do mezzanine on paper for a month and key it in.
+[00:05:15] Priya Nair: Let's park it as a phase two item then, and I'll get you a proper answer on whether offline is feasible and what it would cost. I'll log it as a separate feature request so it doesn't get lost.
+[00:05:24] Tom Reeves: Fine. Make sure it's on the list.
+[00:05:27] Priya Nair: It will be. Right, variances. Grace, this is probably your area. What happens when the count doesn't match?
+[00:05:34] Grace Okafor: So I want tolerance thresholds. Something like, if the variance is under two percent and under fifty pounds, auto-accept and adjust. If it's over either of those, it triggers an automatic recount by a different person. If the recount still doesn't match, it comes to me for approval before anything is posted.
+[00:05:52] Priya Nair: So two tiers. Auto-accept within tolerance, mandatory recount outside, then approval. Are those thresholds the same for every product?
+[00:06:00] Grace Okafor: No, they need to vary by ABC class. A items should be tighter. Maybe one percent and twenty pounds. C items I'm much more relaxed about.
+[00:06:08] Tom Reeves: And anything over a thousand pounds needs to go to me as well, not just Grace. That's a finance control. The FD was quite clear about that.
+[00:06:16] Priya Nair: So a second approval level for high value variances. Is that a value threshold per line or per count session?
+[00:06:22] Tom Reeves: Per line. One SKU, one location.
+[00:06:25] Priya Nair: Got it. And reason codes? Do you want the approver to pick a reason when they accept a variance?
+[00:06:30] Grace Okafor: Yes, mandatory. Damage, theft, mis-pick, receiving error, unit of measure error, unknown. Finance want a report by reason code every month.
+[00:06:39] Priya Nair: I'll send you our standard reason code list and you can tell me what to add or remove. We can configure those per customer.
+[00:06:45] Grace Okafor: Great, send it over and I'll mark it up this week.
+[00:06:49] Dan Whitfield: Can I ask about freezing locations? When we're counting a bay, do we stop picking from it?
+[00:06:55] Priya Nair: That's a good question. What would you want?
+[00:06:58] Dan Whitfield: I don't want to stop picking. If I freeze a bay for half an hour on nights, I'll miss the trailer cut-off. But obviously if someone picks from it while it's being counted, the count's wrong.
+[00:07:08] Priya Nair: So what some of our customers do is a snapshot approach. The system records the expected quantity at the moment the counter scans the location, and any picks or putaways after that timestamp are adjusted for when the variance is calculated. That way you don't have to freeze anything.
+[00:07:22] Grace Okafor: That would be ideal, as long as it's reliable. If it gets it wrong, I'll end up approving adjustments that aren't real.
+[00:07:29] Priya Nair: Fair. I'd suggest we test that specifically during the pilot. I'll get Raj to run through the logic with you, Grace, before we switch it on. Maybe a thirty minute session in early December.
+[00:07:39] Grace Okafor: Yes please. Put something in the diary.
+[00:07:42] Priya Nair: Will do. Tom, ERP side. When an adjustment is approved, where does it need to go?
+[00:07:48] Tom Reeves: It needs to post to Business Central as an inventory adjustment journal. At the moment we do a CSV export from Stockline and the finance team import it, but it's manual and they forget. We need it to post automatically, at least daily.
+[00:08:02] Priya Nair: We've got the Business Central connector already for orders and receipts. I'm fairly sure adjustments aren't in it yet. I'll check with the integrations team whether we can add the adjustment journal for January, otherwise we might be looking at keeping the CSV for the first month.
+[00:08:16] Tom Reeves: I'd really push for that to be in. If finance have to keep doing it manually it undermines the whole thing for the auditors.
+[00:08:23] Priya Nair: Understood, I'll flag it as a must have and escalate if needed. Can you send me a sample of the current CSV and the journal template your finance team uses? That'll speed things up for the integrations team.
+[00:08:34] Tom Reeves: I'll get Mark in finance to send it to you. Probably early next week.
+[00:08:39] Priya Nair: Perfect. Reporting. What do you need to see?
+[00:08:42] Grace Okafor: Inventory record accuracy, by zone and by ABC class, trended weekly. Count completion against the schedule, so I can see if we're falling behind. And variance value by reason code. That's the monthly finance one.
+[00:08:55] Tom Reeves: And I want a single number for the board. Overall inventory accuracy percentage. Our target is ninety-eight percent at location level by the end of Q2.
+[00:09:04] Dan Whitfield: For me it's more practical. I just want to see what counts are outstanding for my shift, and who's done what. Counts per hour per person, that kind of thing. Not to beat anyone up, just so I can plan labour.
+[00:09:16] Priya Nair: So three audiences really. Board level accuracy, Grace's operational dashboards, and Dan's shift view. A lot of that exists in standard reports. I'll do a quick mapping of what's already there versus what's new, and share it with you all.
+[00:09:30] Tom Reeves: Okay. What about users and permissions? I don't want everyone being able to approve adjustments.
+[00:09:36] Priya Nair: We'd set up roles. Counter, supervisor, inventory controller, and finance approver. Counters can count, supervisors can recount and assign, Grace's role approves within limits, and yours approves the high value ones. Does that sound right?
+[00:09:50] Tom Reeves: That's about right. And it all needs an audit trail. Who counted, when, what they entered, who approved it.
+[00:09:56] Priya Nair: That's standard, every transaction is logged. Right, I'm conscious of time, so let me play back what I think is in scope for phase one, then we'll talk pilot. Phase one: ABC based count scheduling with overrides, exception counts from short picks, a separate count queue with priority, blind counts on the handheld with lot and expiry, the tolerance and recount rules by class, two level approval, reason codes, the snapshot logic so you don't have to freeze locations, reporting, and roles. Business Central posting is a must have but at risk.
+[00:10:28] Tom Reeves: Units of measure?
+[00:10:30] Priya Nair: Units of measure I need to check. I'd say it's a should have for phase one. If it's already near done on the roadmap, great.
+[00:10:37] Dan Whitfield: It's honestly more important to me than the reporting.
+[00:10:40] Priya Nair: Noted, Dan. I'll push for it. And offline mode is phase two, with the mezzanine on paper as a stopgap.
+[00:10:47] Tom Reeves: Agreed.
+[00:10:49] Priya Nair: Pilot. My suggestion is we start with one zone at Avonmouth, maybe the A-class pick face in aisles ten to eighteen, for two weeks before rolling out across the site. Then Bristol Road after that.
+[00:11:01] Grace Okafor: Aisles ten to eighteen is a good choice. It's high value and high velocity, so we'll find problems quickly.
+[00:11:07] Dan Whitfield: I can give you two counters on nights for the pilot. Not on days though, days are too busy until after Christmas.
+[00:11:14] Tom Reeves: Can we do the pilot before Christmas? I really don't want to start something new in the first week of January with peak still unwinding.
+[00:11:21] Priya Nair: If we get the configuration signed off by the end of November, I think we can have a pilot running from the eighth of December. That gives you about two weeks before the Christmas freeze.
+[00:11:31] Tom Reeves: Okay. So what do you need from us to get configuration signed off?
+[00:11:36] Priya Nair: Three things. Grace, the ABC overrides and your threshold matrix by class. Tom, the Business Central journal template and sample CSV via Mark. And Dan, a list of who'll be counters and supervisors so we can set up their logins and roles.
+[00:11:50] Dan Whitfield: I can do that by Wednesday.
+[00:11:52] Grace Okafor: I'll have the thresholds to you by Friday, with the reason codes marked up.
+[00:11:57] Tom Reeves: Mark should be early next week, I'll chase him.
+[00:12:00] Priya Nair: Great. And training. Who'll train the counters?
+[00:12:04] Dan Whitfield: If you can train me and one other supervisor, we'll cascade it on nights. It's easier than trying to get your trainer in at two in the morning.
+[00:12:12] Priya Nair: Ha, fair enough. We'll do a train the trainer session, probably ninety minutes, the week before pilot. I'll get our training team to propose some dates.
+[00:12:20] Tom Reeves: One more thing on commercials. Is this included in our subscription or is it an add-on?
+[00:12:25] Priya Nair: Cycle counting itself is in your tier. The Business Central adjustment posting may be chargeable as an integration extension, and offline mode would definitely be a separate quote. I'll get our account director, Simon, to send a formal note on that so there are no surprises.
+[00:12:39] Tom Reeves: Please do, I need it before I go to the FD. Ideally by the end of next week.
+[00:12:44] Priya Nair: I'll make sure Simon knows the deadline.
+[00:12:47] Grace Okafor: Sorry, one thing I forgot. Can counts be scheduled to avoid certain days? I don't want any counts generated on our month end days, the last two working days of each month. We're flat out with despatch.
+[00:12:58] Priya Nair: Blackout dates on the count calendar. I'm fairly sure the scheduler supports excluded days. I'll confirm, but put that down as a requirement.
+[00:13:06] Dan Whitfield: And bank holidays.
+[00:13:08] Priya Nair: And bank holidays, yes.
+[00:13:10] Tom Reeves: I think that's everything from our side. Grace, Dan, anything else?
+[00:13:14] Grace Okafor: Just that I'd like to see a demo of the recount and approval flow before pilot. I don't want to see it for the first time live.
+[00:13:20] Priya Nair: Absolutely. I'll set up a demo environment with your configuration in it. We can do that alongside the session with Raj in early December.
+[00:13:28] Dan Whitfield: Nothing from me. Just get the units of measure thing in, please.
+[00:13:32] Priya Nair: I hear you loud and clear. Okay, quick recap of my actions. I'll check the ABC override capability and come back by Friday. I'll check the units of measure status and the scheduler blackout dates. I'll confirm whether the Business Central adjustment journal can be ready for January and escalate if not. I'll log offline mode as a phase two request and get a cost estimate. I'll send the standard reason code list today. I'll map existing reports against your three reporting needs. I'll book the Raj session and the demo for early December, and the train the trainer session. And Simon will send the commercial note by the end of next week.
+[00:14:08] Tom Reeves: That's a lot. Can you send that round in writing?
+[00:14:11] Priya Nair: I'll send meeting notes this afternoon with all of the actions and owners. Your side: Grace has thresholds and reason codes by Friday, Dan has the user list by Wednesday, and Tom is getting the journal template and CSV from Mark early next week.
+[00:14:26] Tom Reeves: Perfect. And we're targeting pilot on the eighth of December, go live at Avonmouth by mid-January.
+[00:14:32] Priya Nair: Correct. Provided configuration is signed off by the twenty-eighth of November. If anything slips I'll let you know straight away rather than at the last minute.
+[00:14:41] Tom Reeves: Appreciated. Thanks Priya.
+[00:14:43] Grace Okafor: Thanks, speak soon.
+[00:14:45] Dan Whitfield: Cheers, I'm going to bed.
+[00:14:48] Priya Nair: Ha, sleep well Dan. Thanks everyone, bye.
