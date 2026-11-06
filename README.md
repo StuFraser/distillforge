@@ -122,7 +122,7 @@ Then edit `api/local.settings.json`:
 
 ```bash
 dotnet tool restore
-dotnet ef database update --project data --startup-project api
+dotnet ef database update --project data/DistillForge.Data.csproj --startup-project api/DistillForge.Api.csproj
 ```
 
 `dotnet ef` reads the connection string from `api/local.settings.json`. A
@@ -157,7 +157,7 @@ Endpoints are anonymous until Entra ID sign-in is added.
 ```bash
 dotnet build
 dotnet test
-dotnet ef migrations add <Name> --project data --startup-project api
+dotnet ef migrations add <Name> --project data/DistillForge.Data.csproj --startup-project api/DistillForge.Api.csproj
 ```
 
 For iterating on the pipeline plumbing, a 3–4B model is enough. Switch to an 8B model

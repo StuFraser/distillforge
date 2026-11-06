@@ -60,6 +60,8 @@ public class ActionItem
     public string? Owner { get; set; }
     public string? Due { get; set; }
     public bool IsManual { get; set; }
+    /// <summary>One of <see cref="NoteColours.Keys"/>, or null for automatic (pink, yellow when it has a deadline).</summary>
+    public string? Colour { get; set; }
     public int SortOrder { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 

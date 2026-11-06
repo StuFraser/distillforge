@@ -29,6 +29,10 @@ public sealed class ExtractedActionPoint
     [JsonPropertyName("due")]
     public string? Due { get; set; }
 
+    /// <summary>The deadline exactly as worded, when it carries qualifiers beyond the short <see cref="Due"/>.</summary>
+    [JsonPropertyName("due_detail")]
+    public string? DueDetail { get; set; }
+
     [JsonPropertyName("evidence")]
     public List<ExtractedEvidence> Evidence { get; set; } = [];
 }

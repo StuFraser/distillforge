@@ -19,13 +19,16 @@ public static class ExtractionPrompt
         - title: short imperative phrase, at most 10 words
         - summary: one or two sentences of context
         - owner: the person or team responsible, or null if not stated
-        - due: the deadline exactly as stated (e.g. "Friday", "end of Q3"), or null if not stated
+        - due: the deadline as a SHORT tag of at most 4 words (e.g. "Friday", "16 Nov", "End of Q3"), or null if not stated.
+          Drop qualifiers such as "ideally", "by the week of" or "sometime before".
+        - due_detail: the deadline copied exactly as worded in the text (e.g. "ideally the week of the 16th of November"),
+          only when it contains more than the short due tag; otherwise null
         - evidence: one or more items, each with
             - segment_id: the segment label exactly as shown, e.g. "S12"
             - quote: a short phrase (at most 25 words) copied VERBATIM, character for character, from that segment
 
         Respond with JSON only, in this shape:
-        {"action_points":[{"id":"ap_1","title":"...","summary":"...","owner":null,"due":null,"evidence":[{"segment_id":"S1","quote":"..."}]}]}
+        {"action_points":[{"id":"ap_1","title":"...","summary":"...","owner":null,"due":null,"due_detail":null,"evidence":[{"segment_id":"S1","quote":"..."}]}]}
         If there are no action points, respond with {"action_points":[]}.
         """;
 
@@ -67,7 +70,7 @@ public static class ExtractionPrompt
                 {
                     ["type"] = "object",
                     ["additionalProperties"] = false,
-                    ["required"] = new JsonArray("id", "title", "summary", "owner", "due", "evidence"),
+                    ["required"] = new JsonArray("id", "title", "summary", "owner", "due", "due_detail", "evidence"),
                     ["properties"] = new JsonObject
                     {
                         ["id"] = new JsonObject { ["type"] = "string" },
@@ -75,6 +78,7 @@ public static class ExtractionPrompt
                         ["summary"] = new JsonObject { ["type"] = "string" },
                         ["owner"] = new JsonObject { ["type"] = new JsonArray("string", "null") },
                         ["due"] = new JsonObject { ["type"] = new JsonArray("string", "null") },
+                        ["due_detail"] = new JsonObject { ["type"] = new JsonArray("string", "null") },
                         ["evidence"] = new JsonObject
                         {
                             ["type"] = "array",

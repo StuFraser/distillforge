@@ -1,23 +1,29 @@
-<button type="button" class="note @(Selected ? "selected" : "")" style="--note-colour: @EffectiveColour" @onclick="OnClick" title="@Item.Summary" aria-pressed="@Selected">
-    <span class="note-title">@Item.Title</span>
-    @if (!string.IsNullOrEmpty(Item.Owner) || !string.IsNullOrEmpty(Item.Due) || LowConfidence)
-    {
-        <span class="note-meta">
-            @if (!string.IsNullOrEmpty(Item.Owner)) { <span class="chip">@Item.Owner</span> }
-            @if (!string.IsNullOrEmpty(Item.Due)) { <span class="chip chip-due">@Item.Due</span> }
-            @if (LowConfidence) { <span class="chip chip-flag" title="Some evidence couldn't be matched exactly">low confidence</span> }
-        </span>
-    }
-</button>
+@* A wrapper holds two sibling buttons (select + zoom); buttons can't be nested validly. *@
+<div class="note-wrap">
+    <button type="button" class="note @(Selected ? "selected" : "")" style="--note-colour: var(--note-@ColourKey)" @onclick="OnClick" title="@Item.Summary" aria-pressed="@Selected">
+        <span class="note-title">@Item.Title</span>
+        @if (!string.IsNullOrEmpty(Item.Owner) || !string.IsNullOrEmpty(Item.Due) || LowConfidence)
+        {
+            <span class="note-meta">
+                @if (!string.IsNullOrEmpty(Item.Owner)) { <span class="chip" title="Owner: @Item.Owner">@Item.Owner</span> }
+                @if (!string.IsNullOrEmpty(Item.Due)) { <span class="chip chip-due" title="Due: @Item.Due">@Item.Due</span> }
+                @if (LowConfidence) { <span class="chip chip-flag" title="Some evidence couldn't be matched exactly">low confidence</span> }
+            </span>
+        }
+    </button>
+    <button type="button" class="note-zoom" @onclick="OnZoom" aria-label="Open details for @Item.Title" title="Open details">⤢</button>
+</div>
 
 @code {
     [Parameter, EditorRequired] public ActionItemDto Item { get; set; } = default!;
     [Parameter] public bool Selected { get; set; }
-    /// <summary>Explicit colour (e.g. a category's). When null, notes with a deadline are post-it yellow and the rest pink.</summary>
-    [Parameter] public string? Colour { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public EventCallback OnZoom { get; set; }
 
-    private string EffectiveColour => Colour ?? (string.IsNullOrWhiteSpace(Item.Due) ? "var(--note-uncategorised)" : "var(--note-deadline)");
+    /// <summary>The chosen colour, or automatic: yellow when the note has a deadline, otherwise pink.</summary>
+    private string ColourKey => Item.Colour is { } c && NoteColours.IsValid(c)
+        ? c
+        : NoteColours.DefaultFor(!string.IsNullOrWhiteSpace(Item.Due));
 
     private bool LowConfidence => Item.Evidence.Any(e => e.MatchQuality == MatchQuality.Segment);
 }

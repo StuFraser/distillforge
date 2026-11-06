@@ -55,12 +55,12 @@ Key feature is that extracted notes can be linked back to relevant passages in s
 - Build all: `dotnet build`
 - Restore tools (dotnet-ef): `dotnet tool restore`
 - Queue storage for the API: `npx azurite` (or `docker compose up azurite`)
-- Apply migrations: `dotnet ef database update --project data --startup-project api`
+- Apply migrations: `dotnet ef database update --project data/DistillForge.Data.csproj --startup-project api/DistillForge.Api.csproj`
   (reads `ConnectionStrings__Postgres` from `api/local.settings.json`; an env var of the same name overrides it)
 - Run API: `cd api && func start`
 - Run front end: `cd blazor && dotnet watch`
 - Tests: `dotnet test`
-- New migration: `dotnet ef migrations add <Name> --project data --startup-project api`
+- New migration: `dotnet ef migrations add <Name> --project data/DistillForge.Data.csproj --startup-project api/DistillForge.Api.csproj`
 
 ## Deployment (planned)
 - API + database: Azure (Functions + Azure Database for PostgreSQL)

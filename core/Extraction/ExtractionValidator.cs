@@ -61,7 +61,8 @@ public static class ExtractionValidator
             }
 
             evidence.Sort((a, b) => a.Start.CompareTo(b.Start));
-            items.Add(new ValidatedActionPoint(title, Blank(ap.Summary), Blank(ap.Owner), Blank(ap.Due), evidence));
+            var due = Blank(ap.Due);
+            items.Add(new ValidatedActionPoint(title, WithDueDetail(Blank(ap.Summary), due, Blank(ap.DueDetail)), Blank(ap.Owner), due, evidence));
         }
 
         return new ValidationOutcome(items, warnings);
@@ -77,6 +78,21 @@ public static class ExtractionValidator
         if ((t[0] is 'S' or 's') && t.Length > 1 && t.Skip(1).All(char.IsDigit)) return "S" + t[1..];
         return null;
     }
+
+    /// <summary>
+    /// The short due tag drops qualifiers ("ideally the week of the 16th of November" becomes "16 Nov"),
+    /// so the original wording is kept in the summary where whoever acts on the note can still see it.
+    /// </summary>
+    internal static string? WithDueDetail(string? summary, string? due, string? detail)
+    {
+        if (detail is null || (due is not null && SameWords(due, detail))) return summary;
+        var note = $"Deadline as stated: \u201C{detail}\u201D.";
+        return summary is null ? note : $"{summary.TrimEnd()} {note}";
+    }
+
+    private static bool SameWords(string a, string b) => Letters(a) == Letters(b);
+
+    private static string Letters(string s) => new(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
     private static string? Blank(string? s)
     {

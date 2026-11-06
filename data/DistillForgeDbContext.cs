@@ -41,6 +41,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             e.Property(x => x.Title).HasMaxLength(300);
             e.Property(x => x.Owner).HasMaxLength(200);
             e.Property(x => x.Due).HasMaxLength(100);
+            e.Property(x => x.Colour).HasMaxLength(16);
             e.HasOne(x => x.Workspace).WithMany(w => w.ActionItems).HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
             // Removing a category moves its notes back to Uncategorised.
             e.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.SetNull);

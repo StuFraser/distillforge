@@ -17,7 +17,8 @@ public static class Mapping
         a.Id, a.Title, a.Summary, a.Owner, a.Due, a.CategoryId, a.IsManual, a.SortOrder,
         a.Evidence.OrderBy(e => e.Start)
             .Select(e => new EvidenceDto(e.Segment?.Label ?? "", e.Quote, e.Start, e.End, e.MatchQuality))
-            .ToList());
+            .ToList(),
+        a.Colour);
 
     public static ExtractionRunDto ToDto(this ExtractionRun r) => new(
         r.Id, r.WorkspaceId, r.Status, r.Model, r.PromptTokens, r.CompletionTokens, r.ActionItemCount,

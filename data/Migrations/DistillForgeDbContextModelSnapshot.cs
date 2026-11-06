@@ -31,6 +31,10 @@ namespace DistillForge.Data.Migrations
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Colour")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 

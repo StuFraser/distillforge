@@ -71,7 +71,7 @@
             else
             {
                 <button type="button" class="add-source" @onclick="OpenReplace" disabled="@IsExtracting">Replace Source</button>
-                <button type="button" class="secondary" @onclick="StartExtraction" disabled="@IsExtracting">Re-extract</button>
+                <button type="button" class="secondary" @onclick="ConfirmReextract" disabled="@IsExtracting">Re-extract</button>
             }
         </footer>
     </section>
@@ -131,7 +131,7 @@
             <div class="notes-grid">
                 @foreach (var item in VisibleUncategorised)
                 {
-                    <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" />
+                    <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)" />
                 }
                 @if (!IsExtracting && _workspace is not null && _actions.Count == 0)
                 {
@@ -158,6 +158,12 @@
     <ExtractionProgressDialog Run="_run" OnHide="() => _progressHidden = true" />
 }
 
+@if (_editing is not null)
+{
+    <ActionItemDialog Item="_editing" ReadOnly="_workspace?.IsArchived == true" Busy="_editSaving" Error="@_editError"
+                      OnSave="SaveItem" OnCancel="CloseItem" />
+}
+
 @if (_showDialog)
 {
     <AddSourceDialog IsReplace="_replacing" Busy="_saving" OnSubmit="SubmitSource" OnCancel="() => _showDialog = false" />
@@ -176,6 +182,30 @@
     private readonly CancellationTokenSource _cts = new();
 
     private bool _progressHidden;
+
+    private ActionItemDto? _editing;
+    private bool _editSaving;
+    private string? _editError;
+
+    private void OpenItem(ActionItemDto item) { _editError = null; _editing = item; }
+
+    private void CloseItem() => _editing = null;
+
+    private async Task SaveItem(UpdateActionItemRequest request)
+    {
+        if (_editing is null) return;
+        _editSaving = true;
+        _editError = null;
+        try
+        {
+            var saved = await Api.UpdateActionAsync(_editing.Id, request, _cts.Token);
+            var i = _actions.FindIndex(a => a.Id == saved.Id);
+            if (i >= 0) _actions[i] = saved;
+            _editing = null;
+        }
+        catch (ApiException ex) { _editError = ex.Message; }
+        finally { _editSaving = false; }
+    }
 
     // Filters: "" = no filter. Owner may also be Unassigned.
     private const string Unassigned = "__unassigned__";
@@ -333,6 +363,14 @@
         catch (ApiException ex) { _error = ex.Message; return; }
         finally { _saving = false; }
 
+        await StartExtraction();
+    }
+
+    private async Task ConfirmReextract()
+    {
+        if (_actions.Any(a => !a.IsManual) &&
+            !await JS.InvokeAsync<bool>("confirm", "Re-extracting replaces all extracted notes, including any edits you've made to them. Continue?"))
+            return;
         await StartExtraction();
     }
 

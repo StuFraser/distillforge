@@ -30,6 +30,10 @@ public sealed class DistillForgeApi(HttpClient http)
     public async Task<List<ActionItemDto>> GetActionsAsync(Guid workspaceId, CancellationToken ct = default) =>
         await Send<List<ActionItemDto>>(() => http.GetAsync($"workspaces/{workspaceId}/actions", ct), ct) ?? [];
 
+    public async Task<ActionItemDto> UpdateActionAsync(Guid id, UpdateActionItemRequest request, CancellationToken ct = default) =>
+        await Send<ActionItemDto>(() => http.PutAsJsonAsync($"actions/{id}", request, ct), ct)
+        ?? throw new ApiException("That note no longer exists (the workspace may have been re-extracted).");
+
     /// <summary>Starts a run (202), or returns the run already in progress (409).</summary>
     public async Task<ExtractionRunDto> StartExtractionAsync(Guid workspaceId, CancellationToken ct = default)
     {

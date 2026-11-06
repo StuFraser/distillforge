@@ -1,0 +1,112 @@
+<div class="dialog-backdrop" @onclick="BackdropClick">
+    <div class="dialog item-dialog" role="dialog" aria-modal="true" aria-labelledby="item-title" @onclick:stopPropagation="true">
+        <h2 id="item-title">@(ReadOnly ? "Action item (read-only)" : "Action item")</h2>
+
+        @if (Error is not null)
+        {
+            <p class="warning error" role="alert">@Error</p>
+        }
+
+        <label for="item-title-input">Title</label>
+        <input id="item-title-input" type="text" maxlength="@ActionItemValidation.MaxTitle" @bind="_title" @bind:event="oninput" disabled="@(ReadOnly || Busy)" />
+
+        <label for="item-summary">Summary</label>
+        <textarea id="item-summary" rows="5" maxlength="@ActionItemValidation.MaxSummary" @bind="_summary" @bind:event="oninput"
+                  placeholder="Context someone needs to act on this" disabled="@(ReadOnly || Busy)"></textarea>
+
+        <div class="field-row">
+            <div>
+                <label for="item-owner">Owner</label>
+                <input id="item-owner" type="text" maxlength="@ActionItemValidation.MaxOwner" @bind="_owner" @bind:event="oninput" placeholder="Unassigned" disabled="@(ReadOnly || Busy)" />
+            </div>
+            <div>
+                <label for="item-due">Due</label>
+                <input id="item-due" type="text" maxlength="@ActionItemValidation.MaxDue" @bind="_due" @bind:event="oninput" placeholder="e.g. Friday, end of Q3" disabled="@(ReadOnly || Busy)" />
+            </div>
+        </div>
+
+        <div>
+            <span class="field-label" id="colour-label">Colour</span>
+            <div class="swatches" role="radiogroup" aria-labelledby="colour-label">
+                @foreach (var key in NoteColours.Keys)
+                {
+                    var selected = key == SelectedColour;
+                    <button type="button" role="radio" aria-checked="@selected" class="swatch-choice @(selected ? "chosen" : "")"
+                            style="background: var(--note-@key)" title="@SwatchTitle(key)"
+                            aria-label="@NoteColours.Label(key)" @onclick="() => ChooseColour(key)" disabled="@(ReadOnly || Busy)"></button>
+                }
+            </div>
+        </div>
+
+        @if (Item.Evidence.Count > 0)
+        {
+            <details class="evidence">
+                <summary>Source evidence (@Item.Evidence.Count)</summary>
+                <ul>
+                    @foreach (var e in Item.Evidence)
+                    {
+                        <li><span class="chip">@e.SegmentLabel</span> “@e.Quote”</li>
+                    }
+                </ul>
+            </details>
+        }
+
+        <div class="dialog-actions">
+            <button type="button" class="secondary" @onclick="OnCancel" disabled="@Busy">@(ReadOnly ? "Close" : "Cancel")</button>
+            @if (!ReadOnly)
+            {
+                <button type="button" class="secondary" @onclick="Reset" disabled="@(!IsDirty || Busy)">Reset</button>
+                <button type="button" class="primary" @onclick="Save" disabled="@(!IsDirty || !IsValid || Busy)">@(Busy ? "Saving…" : "Save")</button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ActionItemDto Item { get; set; } = default!;
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback<UpdateActionItemRequest> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string _title = "", _summary = "", _owner = "", _due = "";
+    private string? _colour; // null = automatic
+
+    protected override void OnInitialized() => Load();
+
+    private void Load()
+    {
+        _title = Item.Title;
+        _summary = Item.Summary ?? "";
+        _owner = Item.Owner ?? "";
+        _due = Item.Due ?? "";
+        _colour = Item.Colour;
+    }
+
+    private static string? Norm(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private string AutoColour => NoteColours.DefaultFor(Norm(_due) is not null);
+    private string SelectedColour => _colour ?? AutoColour;
+
+    // Picking the automatic colour clears the override, so the note keeps following its deadline.
+    private void ChooseColour(string key) => _colour = key == AutoColour ? null : key;
+
+    private string SwatchTitle(string key) =>
+        key == AutoColour ? $"{NoteColours.Label(key)} (default for this note)" : NoteColours.Label(key);
+
+    private bool IsValid => ActionItemValidation.Validate(Build()) is null;
+
+    private bool IsDirty =>
+        Norm(_title) != Norm(Item.Title) || Norm(_summary) != Norm(Item.Summary) ||
+        Norm(_owner) != Norm(Item.Owner) || Norm(_due) != Norm(Item.Due) || _colour != Item.Colour;
+
+    private UpdateActionItemRequest Build() => new(_title.Trim(), Norm(_summary), Norm(_owner), Norm(_due), _colour);
+
+    private void Reset() => Load();
+
+    private Task Save() => OnSave.InvokeAsync(Build());
+
+    // Don't lose edits to a stray click outside the dialog.
+    private Task BackdropClick() => IsDirty || Busy ? Task.CompletedTask : OnCancel.InvokeAsync();
+}
