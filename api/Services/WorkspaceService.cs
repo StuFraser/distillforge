@@ -53,6 +53,9 @@ public sealed class WorkspaceService(DistillForgeDbContext db)
         workspace.SourceText = source;
         workspace.UpdatedAt = DateTimeOffset.UtcNow;
         ApplySegments(workspace, strategy);
+        // The workspace is already tracked and the new segments carry pre-assigned Guid keys, so EF
+        // would treat them as existing rows (Modified -> UPDATE -> concurrency error). Mark them Added.
+        db.Segments.AddRange(workspace.Segments);
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

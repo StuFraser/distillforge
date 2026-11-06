@@ -58,6 +58,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
         {
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.Model).HasMaxLength(200);
+            e.Property(x => x.Phase).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.FinishReason).HasMaxLength(32);
             e.HasOne(x => x.Workspace).WithMany(w => w.ExtractionRuns).HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
         });

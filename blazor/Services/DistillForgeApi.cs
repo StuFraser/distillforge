@@ -9,8 +9,14 @@ public sealed class ApiException(string message) : Exception(message);
 /// <summary>Typed client for the Functions API. The browser never talks to the database or the AI provider.</summary>
 public sealed class DistillForgeApi(HttpClient http)
 {
-    public async Task<List<WorkspaceSummaryDto>> ListWorkspacesAsync(CancellationToken ct = default) =>
-        await Send<List<WorkspaceSummaryDto>>(() => http.GetAsync("workspaces", ct), ct) ?? [];
+    public async Task<List<WorkspaceSummaryDto>> ListWorkspacesAsync(bool includeArchived = false, CancellationToken ct = default) =>
+        await Send<List<WorkspaceSummaryDto>>(() => http.GetAsync($"workspaces?includeArchived={(includeArchived ? "true" : "false")}", ct), ct) ?? [];
+
+    public async Task SetArchivedAsync(Guid id, bool archived, CancellationToken ct = default) =>
+        await Send<WorkspaceSummaryDto>(() => http.PostAsync($"workspaces/{id}/{(archived ? "archive" : "unarchive")}", null, ct), ct);
+
+    public async Task<ExtractionRunDto?> GetLatestRunAsync(Guid workspaceId, CancellationToken ct = default) =>
+        (await Send<List<ExtractionRunDto>>(() => http.GetAsync($"workspaces/{workspaceId}/runs", ct), ct))?.FirstOrDefault();
 
     public Task<WorkspaceDto?> GetWorkspaceAsync(Guid id, CancellationToken ct = default) =>
         Send<WorkspaceDto>(() => http.GetAsync($"workspaces/{id}", ct), ct);

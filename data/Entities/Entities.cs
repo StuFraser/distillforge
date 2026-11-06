@@ -95,6 +95,12 @@ public class ExtractionRun
     public int? ActionItemCount { get; set; }
     public string? Error { get; set; }
     public string? Warnings { get; set; }
+
+    // Live progress, updated as the run works through its passes.
+    public ExtractionPhase? Phase { get; set; }
+    public int? WindowIndex { get; set; }
+    public int? WindowCount { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }

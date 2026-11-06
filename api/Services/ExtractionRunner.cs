@@ -8,8 +8,8 @@ using Microsoft.Extensions.Logging;
 namespace DistillForge.Api.Services;
 
 /// <summary>
-/// Single-window pipeline: extract → validate (segment IDs, quotes) → resolve offsets → persist.
-/// Multi-window, dedupe and consolidation slot in between extract and validate later.
+/// Pipeline: plan windows → per window: extract → validate (segment IDs, quotes) → resolve offsets →
+/// merge duplicates from overlapping windows (pass 1), then an LLM consolidation pass (pass 2) → persist. Documents that fit the budget are one window.
 /// </summary>
 public sealed class ExtractionRunner(DistillForgeDbContext db, IActionExtractor extractor, ILogger<ExtractionRunner> logger)
 {
@@ -37,10 +37,91 @@ public sealed class ExtractionRunner(DistillForgeDbContext db, IActionExtractor 
                 .Include(w => w.Segments)
                 .FirstAsync(w => w.Id == run.WorkspaceId, ct);
             var segments = workspace.ToCoreSegments();
-            run.EstimatedPromptTokens = Ai.ExtractionPrompt.EstimateTokens(segments);
 
-            var result = await extractor.ExtractAsync(segments, ct);
-            var outcome = ExtractionValidator.Validate(result.Response, segments);
+            int windowBudget = extractor.PromptBudgetTokens - Ai.ExtractionPrompt.FixedOverhead;
+            if (windowBudget <= 0)
+                throw new Ai.ExtractionFailedException(
+                    $"Prompt budget ({extractor.PromptBudgetTokens} tokens) is too small for the extraction prompt; increase AiProvider:ContextTokens.");
+            var windows = WindowPlanner.Plan(segments, windowBudget);
+            run.EstimatedPromptTokens = windows.Sum(w => Ai.ExtractionPrompt.EstimateTokens(w.Segments));
+            logger.LogInformation("Run {RunId}: {Segments} segments in {Windows} window(s), window budget {Budget} tokens.",
+                runId, segments.Count, windows.Count, windowBudget);
+
+            var warnings = new List<string>();
+            var found = new List<ValidatedActionPoint>();
+            int? promptTokens = null, completionTokens = null;
+            string? model = null, finishReason = null;
+            string? lastFailure = null;
+            int failed = 0;
+
+            foreach (var window in windows)
+            {
+                var label = windows.Count > 1 ? $"Window {window.Index}/{window.Count}: " : "";
+                await ReportProgress(run, ExtractionPhase.Extracting, window.Index, window.Count, ct);
+                try
+                {
+                    var result = await extractor.ExtractAsync(window, ct);
+                    // Validate against this window's segments only: evidence must come from what the model was shown.
+                    var outcome = ExtractionValidator.Validate(result.Response, window.Segments);
+                    found.AddRange(outcome.ActionPoints);
+                    warnings.AddRange(result.Warnings.Concat(outcome.Warnings).Select(w => label + w));
+
+                    model = result.Model;
+                    finishReason = result.FinishReason;
+                    promptTokens = Add(promptTokens, result.Usage?.PromptTokens);
+                    completionTokens = Add(completionTokens, result.Usage?.CompletionTokens);
+                }
+                catch (Exception ex) when (windows.Count > 1 && !ct.IsCancellationRequested
+                    && ex is Ai.ExtractionFailedException or HttpRequestException or TaskCanceledException)
+                {
+                    // One bad window shouldn't discard the others' (expensive) results.
+                    failed++;
+                    lastFailure = ex.Message;
+                    logger.LogError(ex, "Run {RunId}: window {Index}/{Count} failed.", runId, window.Index, window.Count);
+                    warnings.Add($"{label}failed ({ex.Message}); notes from this part of the document are missing.");
+                }
+            }
+
+            if (failed == windows.Count)
+                throw new Ai.ExtractionFailedException($"Every window failed. Last error: {lastFailure}");
+
+            // Overlapping windows report boundary items twice; merge the obvious ones in code first.
+            var merged = ActionPointDeduplicator.Merge(found.OrderBy(ap => ap.Evidence[0].Start)).ToList();
+            if (merged.Count < found.Count)
+                logger.LogInformation("Run {RunId}: merged {Merged} duplicate action point(s) across windows.", runId, found.Count - merged.Count);
+
+            // Pass 2: ask the model to spot paraphrased duplicates. Only worth it when windows overlapped.
+            if (windows.Count > 1 && merged.Count > 1)
+            {
+                await ReportProgress(run, ExtractionPhase.Consolidating, windows.Count, windows.Count, ct);
+                try
+                {
+                    var candidates = ActionPointConsolidator.ToCandidates(merged);
+                    int estimate = extractor.EstimateConsolidationTokens(candidates);
+                    if (estimate > extractor.PromptBudgetTokens)
+                    {
+                        warnings.Add($"Consolidation skipped: {candidates.Count} candidates (~{estimate} tokens) exceed the prompt budget; duplicates may remain.");
+                    }
+                    else
+                    {
+                        var result = await extractor.ConsolidateAsync(candidates, ct);
+                        var outcome = ActionPointConsolidator.Apply(merged, result.Response);
+                        merged = outcome.ActionPoints.ToList();
+                        warnings.AddRange(result.Warnings.Concat(outcome.Warnings).Select(w => "Consolidation: " + w));
+                        promptTokens = Add(promptTokens, result.Usage?.PromptTokens);
+                        completionTokens = Add(completionTokens, result.Usage?.CompletionTokens);
+                        logger.LogInformation("Run {RunId}: consolidation merged {Merged} further action point(s).", runId, outcome.MergedCount);
+                    }
+                }
+                catch (Exception ex) when (!ct.IsCancellationRequested
+                    && ex is Ai.ExtractionFailedException or HttpRequestException or TaskCanceledException)
+                {
+                    // Non-fatal: the deterministic merge above is still a usable result.
+                    logger.LogError(ex, "Run {RunId}: consolidation failed.", runId);
+                    warnings.Add($"Consolidation pass failed ({ex.Message}); duplicates may remain.");
+                }
+            }
+            merged = merged.OrderBy(ap => ap.Evidence[0].Start).ToList();
 
             // Re-running extraction replaces previously generated notes; manual notes are kept.
             await db.ActionItems.Where(a => a.WorkspaceId == workspace.Id && !a.IsManual).ExecuteDeleteAsync(ct);
@@ -48,7 +129,7 @@ public sealed class ExtractionRunner(DistillForgeDbContext db, IActionExtractor 
             var segmentIds = workspace.Segments.ToDictionary(s => s.Label, s => s.Id);
             var now = DateTimeOffset.UtcNow;
             int order = 0;
-            foreach (var ap in outcome.ActionPoints)
+            foreach (var ap in merged)
             {
                 db.ActionItems.Add(new ActionItem
                 {
@@ -73,12 +154,11 @@ public sealed class ExtractionRunner(DistillForgeDbContext db, IActionExtractor 
                 });
             }
 
-            run.Model = result.Model;
-            run.FinishReason = result.FinishReason;
-            run.PromptTokens = result.Usage?.PromptTokens;
-            run.CompletionTokens = result.Usage?.CompletionTokens;
-            run.ActionItemCount = outcome.ActionPoints.Count;
-            var warnings = result.Warnings.Concat(outcome.Warnings).ToList();
+            run.Model = model;
+            run.FinishReason = finishReason;
+            run.PromptTokens = promptTokens;
+            run.CompletionTokens = completionTokens;
+            run.ActionItemCount = merged.Count;
             run.Warnings = warnings.Count > 0 ? string.Join('\n', warnings) : null;
             run.Status = ExtractionRunStatus.Succeeded;
         }
@@ -97,6 +177,17 @@ public sealed class ExtractionRunner(DistillForgeDbContext db, IActionExtractor 
         run.CompletedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(CancellationToken.None);
     }
+
+    /// <summary>Persists live progress so the polling client can show where the run is up to.</summary>
+    private async Task ReportProgress(ExtractionRun run, ExtractionPhase phase, int index, int count, CancellationToken ct)
+    {
+        run.Phase = phase;
+        run.WindowIndex = index;
+        run.WindowCount = count;
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static int? Add(int? total, int? value) => value is null ? total : (total ?? 0) + value;
 
     private static string? Clip(string? s, int max) => s is null || s.Length <= max ? s : s[..max];
 }

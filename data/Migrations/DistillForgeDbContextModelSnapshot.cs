@@ -167,6 +167,10 @@ namespace DistillForge.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("Phase")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<int?>("PromptTokens")
                         .HasColumnType("integer");
 
@@ -180,6 +184,12 @@ namespace DistillForge.Data.Migrations
 
                     b.Property<string>("Warnings")
                         .HasColumnType("text");
+
+                    b.Property<int?>("WindowCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("WindowIndex")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid");

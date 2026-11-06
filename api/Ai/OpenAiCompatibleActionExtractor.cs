@@ -14,7 +14,7 @@ public sealed class ExtractionFailedException(string message, Exception? inner =
 /// <summary>
 /// Plain OpenAI-style chat completions + response_format. No backend-specific code paths,
 /// so the same client works against Ollama, LM Studio or a hosted provider.
-/// Single window only for now: documents over the prompt budget are rejected.
+/// One call = one window; windowing and merging live in ExtractionRunner.
 /// </summary>
 public sealed class OpenAiCompatibleActionExtractor(
     HttpClient http,
@@ -23,8 +23,11 @@ public sealed class OpenAiCompatibleActionExtractor(
 {
     private readonly AiProviderOptions _opt = options.Value;
 
-    public async Task<ExtractionResult> ExtractAsync(IReadOnlyList<Segment> segments, CancellationToken cancellationToken = default)
+    public int PromptBudgetTokens => _opt.PromptBudget;
+
+    public async Task<ExtractionResult> ExtractAsync(ExtractionWindow window, CancellationToken cancellationToken = default)
     {
+        var segments = window.Segments;
         if (string.IsNullOrWhiteSpace(_opt.BaseUrl) || string.IsNullOrWhiteSpace(_opt.Model))
             throw new ExtractionFailedException("AiProvider:BaseUrl and AiProvider:Model must be configured.");
 
@@ -32,21 +35,51 @@ public sealed class OpenAiCompatibleActionExtractor(
         if (estimate > _opt.PromptBudget)
         {
             throw new ExtractionFailedException(
-                $"Document is ~{estimate} tokens but the single-window budget is {_opt.PromptBudget} " +
+                $"Window is ~{estimate} tokens but the prompt budget is {_opt.PromptBudget} " +
                 $"(ContextTokens {_opt.ContextTokens} - ReserveOutput {_opt.ReserveOutput}, less {_opt.SafetyMargin:P0}). " +
-                "Multi-window extraction is not implemented yet.");
+                "A single segment is larger than the budget; increase AiProvider:ContextTokens.");
         }
 
-        var warnings = new List<string>();
         var messages = new JsonArray
         {
             new JsonObject { ["role"] = "system", ["content"] = ExtractionPrompt.System },
-            new JsonObject { ["role"] = "user", ["content"] = ExtractionPrompt.BuildUserMessage(segments) },
+            new JsonObject { ["role"] = "user", ["content"] = ExtractionPrompt.BuildUserMessage(window) },
         };
 
-        var first = await CompleteAsync(messages, cancellationToken);
-        if (TryParse(first.Content, out var response, out var parseError))
-            return Result(response!, first, estimate, warnings);
+        var (response, completion, warnings) = await CompleteJsonAsync<ExtractionResponse>(
+            messages, "action_points", ExtractionPrompt.Schema(), cancellationToken);
+        return Result(response, completion, estimate, warnings);
+    }
+
+    public int EstimateConsolidationTokens(IReadOnlyList<ConsolidationCandidate> candidates) =>
+        ConsolidationPrompt.EstimateTokens(candidates);
+
+    public async Task<ConsolidationResult> ConsolidateAsync(IReadOnlyList<ConsolidationCandidate> candidates, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_opt.BaseUrl) || string.IsNullOrWhiteSpace(_opt.Model))
+            throw new ExtractionFailedException("AiProvider:BaseUrl and AiProvider:Model must be configured.");
+
+        var messages = new JsonArray
+        {
+            new JsonObject { ["role"] = "system", ["content"] = ConsolidationPrompt.System },
+            new JsonObject { ["role"] = "user", ["content"] = ConsolidationPrompt.BuildUserMessage(candidates) },
+        };
+
+        var (response, c, warnings) = await CompleteJsonAsync<ConsolidationResponse>(
+            messages, ConsolidationPrompt.SchemaName, ConsolidationPrompt.Schema(), cancellationToken);
+        logger.LogInformation("Consolidation call: {Candidates} candidates, {Groups} merge group(s), prompt {Prompt}, completion {Completion}",
+            candidates.Count, response.Merges.Count, c.Usage?.PromptTokens, c.Usage?.CompletionTokens);
+        return new ConsolidationResult(response, c.Model, c.FinishReason, c.Usage, warnings);
+    }
+
+    /// <summary>Completes, parses as <typeparamref name="T"/>, and retries once with a correction if the JSON is bad.</summary>
+    private async Task<(T Value, Completion Completion, List<string> Warnings)> CompleteJsonAsync<T>(
+        JsonArray messages, string schemaName, JsonObject schema, CancellationToken ct) where T : class
+    {
+        var warnings = new List<string>();
+        var first = await CompleteAsync(messages, schemaName, schema, ct);
+        if (TryParse<T>(first.Content, out var value, out var parseError))
+            return (value!, first, warnings);
 
         // Validate-and-retry: many OpenAI-compatible backends only partially honour strict schemas.
         logger.LogWarning("Model returned invalid JSON ({Error}); retrying once.", parseError);
@@ -58,9 +91,9 @@ public sealed class OpenAiCompatibleActionExtractor(
             ["content"] = "That was not valid JSON in the required shape. Respond again with the JSON object only, no prose or code fences.",
         });
 
-        var second = await CompleteAsync(messages, cancellationToken);
-        if (TryParse(second.Content, out response, out parseError))
-            return Result(response!, second, estimate, warnings);
+        var second = await CompleteAsync(messages, schemaName, schema, ct);
+        if (TryParse<T>(second.Content, out value, out parseError))
+            return (value!, second, warnings);
 
         throw new ExtractionFailedException($"Model returned invalid JSON twice: {parseError}");
     }
@@ -81,7 +114,7 @@ public sealed class OpenAiCompatibleActionExtractor(
 
     private sealed record Completion(string Content, string Model, string? FinishReason, TokenUsage? Usage);
 
-    private async Task<Completion> CompleteAsync(JsonArray messages, CancellationToken ct)
+    private async Task<Completion> CompleteAsync(JsonArray messages, string schemaName, JsonObject schema, CancellationToken ct)
     {
         var body = new JsonObject
         {
@@ -99,9 +132,9 @@ public sealed class OpenAiCompatibleActionExtractor(
                     ["type"] = "json_schema",
                     ["json_schema"] = new JsonObject
                     {
-                        ["name"] = "action_points",
+                        ["name"] = schemaName,
                         ["strict"] = true,
-                        ["schema"] = ExtractionPrompt.Schema(),
+                        ["schema"] = schema,
                     },
                 };
                 break;
@@ -151,14 +184,14 @@ public sealed class OpenAiCompatibleActionExtractor(
         return new Completion(content, model, finish, usage);
     }
 
-    internal static bool TryParse(string content, out ExtractionResponse? response, out string? error)
+    internal static bool TryParse<T>(string content, out T? response, out string? error) where T : class
     {
         response = null;
         error = null;
         var json = StripCodeFence(content);
         try
         {
-            response = JsonSerializer.Deserialize<ExtractionResponse>(json);
+            response = JsonSerializer.Deserialize<T>(json);
             if (response is null) { error = "empty response"; return false; }
             return true;
         }

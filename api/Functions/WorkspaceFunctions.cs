@@ -16,11 +16,14 @@ public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceServic
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "workspaces")] HttpRequest req,
         CancellationToken ct)
     {
-        var items = await db.Workspaces.AsNoTracking()
-            .Where(w => !w.IsArchived)
+        // Archived workspaces are hidden unless asked for: GET /api/workspaces?includeArchived=true
+        var includeArchived = bool.TryParse(req.Query["includeArchived"], out var flag) && flag;
+        var rows = await db.Workspaces.AsNoTracking()
+            .Where(w => includeArchived || !w.IsArchived)
             .OrderByDescending(w => w.UpdatedAt)
+            .Select(w => new { Workspace = w, Count = w.ActionItems.Count })
             .ToListAsync(ct);
-        return new OkObjectResult(items.Select(w => w.ToSummaryDto()));
+        return new OkObjectResult(rows.Select(r => r.Workspace.ToSummaryDto(r.Count)));
     }
 
     [Function("GetWorkspace")]
@@ -30,7 +33,7 @@ public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceServic
         CancellationToken ct)
     {
         var w = await db.Workspaces.AsNoTracking().Include(x => x.Segments)
-            .FirstOrDefaultAsync(x => x.Id == id && !x.IsArchived, ct);
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
         return w is null ? new NotFoundResult() : new OkObjectResult(w.ToDto());
     }
 
@@ -71,6 +74,29 @@ public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceServic
         }
     }
 
+    [Function("ArchiveWorkspace")]
+    public Task<IActionResult> Archive(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "workspaces/{id:guid}/archive")] HttpRequest req,
+        Guid id, CancellationToken ct) => SetArchived(id, true, ct);
+
+    [Function("UnarchiveWorkspace")]
+    public Task<IActionResult> Unarchive(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "workspaces/{id:guid}/unarchive")] HttpRequest req,
+        Guid id, CancellationToken ct) => SetArchived(id, false, ct);
+
+    [Function("ListWorkspaceRuns")]
+    public async Task<IActionResult> ListRuns(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "workspaces/{id:guid}/runs")] HttpRequest req,
+        Guid id,
+        CancellationToken ct)
+    {
+        var runs = await db.ExtractionRuns.AsNoTracking()
+            .Where(r => r.WorkspaceId == id)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync(ct);
+        return new OkObjectResult(runs.Select(r => r.ToDto()));
+    }
+
     [Function("ListActionItems")]
     public async Task<IActionResult> ListActions(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "workspaces/{id:guid}/actions")] HttpRequest req,
@@ -83,6 +109,19 @@ public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceServic
             .OrderBy(a => a.SortOrder)
             .ToListAsync(ct);
         return new OkObjectResult(items.Select(a => a.ToDto()));
+    }
+
+    private async Task<IActionResult> SetArchived(Guid id, bool archived, CancellationToken ct)
+    {
+        // Deliberately leaves UpdatedAt alone: archiving is housekeeping, not an edit.
+        var w = await db.Workspaces.FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (w is null) return new NotFoundResult();
+        if (w.IsArchived != archived)
+        {
+            w.IsArchived = archived;
+            await db.SaveChangesAsync(ct);
+        }
+        return new OkObjectResult(w.ToSummaryDto(await db.ActionItems.CountAsync(a => a.WorkspaceId == id, ct)));
     }
 
     internal static async Task<T?> ReadBody<T>(HttpRequest req, CancellationToken ct) where T : class

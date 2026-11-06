@@ -15,11 +15,34 @@
 
 <div class="workspace">
     <section class="panel source-panel" aria-label="Source">
+        <div class="workspace-bar">
+            <select aria-label="Workspace" @onchange="OnWorkspaceChosen" disabled="@(IsExtracting || _saving)">
+                @if (_workspace is null)
+                {
+                    <option value="" selected>@(_list.Count == 0 ? "No workspaces" : "Select a workspace…")</option>
+                }
+                @foreach (var w in _list)
+                {
+                    <option value="@w.Id" selected="@(w.Id == _workspace?.Id)">@(w.IsArchived ? "📦 " : "")@w.Title (@w.ActionItemCount) · @w.UpdatedAt.ToLocalTime().ToString("d MMM HH:mm")</option>
+                }
+            </select>
+            <button type="button" class="secondary" @onclick="OpenNew" disabled="@(IsExtracting || _saving)" title="Start a new workspace">+ New</button>
+            @if (_workspace is not null)
+            {
+                <button type="button" class="secondary" @onclick="ToggleArchive" disabled="@(IsExtracting || _saving)"
+                        title="@(_workspace.IsArchived ? "Restore this workspace to the active list" : "Hide this workspace from the active list")">
+                    @(_workspace.IsArchived ? "Unarchive" : "Archive")
+                </button>
+            }
+            <label class="show-archived">
+                <input type="checkbox" checked="@_showArchived" @onchange="OnShowArchivedChanged" /> Show archived
+            </label>
+        </div>
         <header class="panel-header">
             <h2>@(_workspace?.Title ?? "Source")</h2>
             @if (_workspace is not null)
             {
-                <span class="muted">@_workspace.Strategy · @_workspace.Segments.Count segments</span>
+                <span class="muted">@(_workspace.IsArchived ? "Archived · " : "")@_workspace.Strategy · @_workspace.Segments.Count segments</span>
             }
         </header>
 
@@ -29,7 +52,7 @@
         }
         else if (_workspace is null)
         {
-            <p class="muted pad">No source yet. Add a document to extract action points.</p>
+            <p class="muted pad">@(_list.Count == 0 ? "No source yet. Add a document to extract action points." : "Pick a workspace above, or start a new one.")</p>
         }
         else
         {
@@ -37,9 +60,17 @@
         }
 
         <footer class="panel-footer">
-            <button type="button" class="add-source" @onclick="() => _showDialog = true" disabled="@IsExtracting">Add Source</button>
-            @if (_workspace is not null)
+            @if (_workspace is null)
             {
+                <button type="button" class="add-source" @onclick="OpenNew" disabled="@IsExtracting">Add Source</button>
+            }
+            else if (_workspace.IsArchived)
+            {
+                <span class="muted archived-note">Archived workspaces are read-only. Unarchive to re-extract or replace the source.</span>
+            }
+            else
+            {
+                <button type="button" class="add-source" @onclick="OpenReplace" disabled="@IsExtracting">Replace Source</button>
                 <button type="button" class="secondary" @onclick="StartExtraction" disabled="@IsExtracting">Re-extract</button>
             }
         </footer>
@@ -51,7 +82,7 @@
                 <h2>Uncategorised</h2>
                 @if (IsExtracting)
                 {
-                    <span class="status running">Extracting… @(_run?.Status == ExtractionRunStatus.Queued ? "(queued)" : "")</span>
+                    <button type="button" class="status running as-button" @onclick="() => _progressHidden = false" title="Show progress">@ProgressText</button>
                 }
                 else if (_run?.Status == ExtractionRunStatus.Failed)
                 {
@@ -64,14 +95,51 @@
                     </span>
                 }
             </header>
+            @if (_actions.Count > 0)
+            {
+                <div class="filter-bar" role="search" aria-label="Filter action items">
+                    <label>
+                        Party
+                        <select @bind="OwnerFilter">
+                            <option value="">All (@_actions.Count)</option>
+                            @foreach (var (name, count) in Owners)
+                            {
+                                <option value="@name">@name (@count)</option>
+                            }
+                            @if (_actions.Any(a => string.IsNullOrWhiteSpace(a.Owner)))
+                            {
+                                <option value="@Unassigned">Unassigned (@_actions.Count(a => string.IsNullOrWhiteSpace(a.Owner)))</option>
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        Deadline
+                        <select @bind="DueFilter">
+                            <option value="">Any</option>
+                            <option value="with">With deadline (@_actions.Count(HasDue))</option>
+                            <option value="without">No deadline (@_actions.Count(a => !HasDue(a)))</option>
+                        </select>
+                    </label>
+                    <span class="swatch-key" title="Notes with a deadline are yellow"><span class="swatch"></span>deadline</span>
+                    @if (FiltersActive)
+                    {
+                        <button type="button" class="link" @onclick="ResetFilters">Clear filters</button>
+                    }
+                    <span class="muted filter-count">Showing @VisibleUncategorised.Count of @_actions.Count(a => a.CategoryId is null)</span>
+                </div>
+            }
             <div class="notes-grid">
-                @foreach (var item in _actions.Where(a => a.CategoryId is null))
+                @foreach (var item in VisibleUncategorised)
                 {
                     <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" />
                 }
                 @if (!IsExtracting && _workspace is not null && _actions.Count == 0)
                 {
                     <p class="muted">No action items yet.</p>
+                }
+                else if (_actions.Count > 0 && VisibleUncategorised.Count == 0)
+                {
+                    <p class="muted">No notes match the current filters.</p>
                 }
             </div>
         </section>
@@ -85,9 +153,14 @@
     </div>
 </div>
 
+@if (IsExtracting && !_progressHidden && _run is not null)
+{
+    <ExtractionProgressDialog Run="_run" OnHide="() => _progressHidden = true" />
+}
+
 @if (_showDialog)
 {
-    <AddSourceDialog IsReplace="_workspace is not null" Busy="_saving" OnSubmit="SubmitSource" OnCancel="() => _showDialog = false" />
+    <AddSourceDialog IsReplace="_replacing" Busy="_saving" OnSubmit="SubmitSource" OnCancel="() => _showDialog = false" />
 }
 
 @code {
@@ -96,9 +169,66 @@
     private ExtractionRunDto? _run;
     private Guid? _selectedId;
     private IReadOnlyList<HighlightRange> _highlights = [];
+    private List<WorkspaceSummaryDto> _list = [];
+    private bool _showArchived, _replacing;
     private bool _loading = true, _saving, _showDialog, _scrollPending;
     private string? _error;
     private readonly CancellationTokenSource _cts = new();
+
+    private bool _progressHidden;
+
+    // Filters: "" = no filter. Owner may also be Unassigned.
+    private const string Unassigned = "__unassigned__";
+    private string _ownerFilter = "", _dueFilter = "";
+
+    private string OwnerFilter { get => _ownerFilter; set { _ownerFilter = value; OnFilterChanged(); } }
+    private string DueFilter { get => _dueFilter; set { _dueFilter = value; OnFilterChanged(); } }
+    private bool FiltersActive => _ownerFilter != "" || _dueFilter != "";
+
+    private static bool HasDue(ActionItemDto a) => !string.IsNullOrWhiteSpace(a.Due);
+
+    /// <summary>Distinct party names (case-insensitive) with how many notes each owns.</summary>
+    private IEnumerable<(string Name, int Count)> Owners =>
+        _actions.Where(a => !string.IsNullOrWhiteSpace(a.Owner))
+            .GroupBy(a => a.Owner!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(g => (g.Key, g.Count()));
+
+    private bool Matches(ActionItemDto a)
+    {
+        bool ownerOk = _ownerFilter switch
+        {
+            "" => true,
+            Unassigned => string.IsNullOrWhiteSpace(a.Owner),
+            var name => string.Equals(a.Owner?.Trim(), name, StringComparison.OrdinalIgnoreCase),
+        };
+        bool dueOk = _dueFilter switch
+        {
+            "with" => HasDue(a),
+            "without" => !HasDue(a),
+            _ => true,
+        };
+        return ownerOk && dueOk;
+    }
+
+    private List<ActionItemDto> VisibleUncategorised => _actions.Where(a => a.CategoryId is null && Matches(a)).ToList();
+
+    private void OnFilterChanged()
+    {
+        // Don't leave a highlight in the source for a note the filter just hid.
+        if (_selectedId is Guid id && !_actions.Any(a => a.Id == id && Matches(a))) ClearSelection();
+    }
+
+    private void ResetFilters()
+    {
+        _ownerFilter = _dueFilter = "";
+    }
+
+    private string ProgressText =>
+        _run?.Status == ExtractionRunStatus.Queued ? "Extracting… (queued)"
+        : _run?.Phase == ExtractionPhase.Consolidating ? "Pass 2 · consolidating…"
+        : _run?.WindowCount is > 1 ? $"Pass 1 · window {_run.WindowIndex}/{_run.WindowCount}"
+        : "Extracting…";
 
     private bool IsExtracting => _run?.Status is ExtractionRunStatus.Queued or ExtractionRunStatus.Running;
 
@@ -106,32 +236,99 @@
     {
         try
         {
-            var list = await Api.ListWorkspacesAsync(_cts.Token);
-            if (list.Count > 0) await LoadWorkspace(list[0].Id);
+            await RefreshList();
+            // Open the most recently updated active workspace; the picker handles the rest.
+            var first = _list.FirstOrDefault(w => !w.IsArchived);
+            if (first is not null) await LoadWorkspace(first.Id);
         }
         catch (ApiException ex) { _error = ex.Message; }
         finally { _loading = false; }
     }
 
+    private async Task RefreshList() =>
+        _list = await Api.ListWorkspacesAsync(_showArchived, _cts.Token);
+
     private async Task LoadWorkspace(Guid id)
     {
         _workspace = await Api.GetWorkspaceAsync(id, _cts.Token);
         _actions = _workspace is null ? [] : await Api.GetActionsAsync(id, _cts.Token);
+        _run = _workspace is null ? null : await Api.GetLatestRunAsync(id, _cts.Token);
+        ResetFilters();
+        ClearSelection();
+        // A run left in flight (e.g. page refreshed mid-extraction) is picked up again.
+        if (IsExtracting) _ = PollRun();
+    }
+
+    private async Task OnWorkspaceChosen(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id) || id == _workspace?.Id) return;
+        try { await LoadWorkspace(id); }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
+    private async Task OnShowArchivedChanged(ChangeEventArgs e)
+    {
+        _showArchived = e.Value is true;
+        try
+        {
+            await RefreshList();
+            // Hiding archived while one is open: fall back to an active workspace.
+            if (!_showArchived && _workspace?.IsArchived == true)
+            {
+                var next = _list.FirstOrDefault();
+                if (next is not null) await LoadWorkspace(next.Id); else ClearWorkspace();
+            }
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
+    private async Task ToggleArchive()
+    {
+        if (_workspace is null) return;
+        var archive = !_workspace.IsArchived;
+        try
+        {
+            await Api.SetArchivedAsync(_workspace.Id, archive, _cts.Token);
+            var id = _workspace.Id;
+            await RefreshList();
+            if (archive && !_showArchived)
+            {
+                var next = _list.FirstOrDefault();
+                if (next is not null) await LoadWorkspace(next.Id); else ClearWorkspace();
+            }
+            else
+            {
+                await LoadWorkspace(id);
+            }
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
+    private void ClearWorkspace()
+    {
+        _workspace = null;
+        _actions = [];
+        _run = null;
         ClearSelection();
     }
+
+    private void OpenNew() { _replacing = false; _showDialog = true; }
+
+    private void OpenReplace() { _replacing = true; _showDialog = true; }
 
     private async Task SubmitSource((string Text, SegmentationStrategyKind? Strategy) input)
     {
         _saving = true;
         try
         {
-            _workspace = _workspace is null
+            _workspace = !_replacing || _workspace is null
                 ? await Api.CreateWorkspaceAsync(new CreateWorkspaceRequest(input.Text, null, input.Strategy), _cts.Token)
                 : await Api.ReplaceSourceAsync(_workspace.Id, new ReplaceSourceRequest(input.Text, input.Strategy), _cts.Token);
             _actions = [];
             _run = null;
             ClearSelection();
             _showDialog = false;
+            await RefreshList();
         }
         catch (ApiException ex) { _error = ex.Message; return; }
         finally { _saving = false; }
@@ -144,6 +341,7 @@
         if (_workspace is null) return;
         try
         {
+            _progressHidden = false;
             _run = await Api.StartExtractionAsync(_workspace.Id, _cts.Token);
             StateHasChanged();
             await PollRun();
@@ -156,13 +354,16 @@
     {
         while (IsExtracting && !_cts.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(2), _cts.Token);
+            await Task.Delay(TimeSpan.FromSeconds(1), _cts.Token);
             _run = await Api.GetRunAsync(_run!.Id, _cts.Token);
             StateHasChanged();
         }
         if (_run?.Status == ExtractionRunStatus.Succeeded && _workspace is not null)
         {
             _actions = await Api.GetActionsAsync(_workspace.Id, _cts.Token);
+            // A re-extract can drop the party being filtered on; don't strand the user on an empty view.
+            if (_ownerFilter is not ("" or Unassigned) && !Owners.Any(o => string.Equals(o.Name, _ownerFilter, StringComparison.OrdinalIgnoreCase)))
+                _ownerFilter = "";
             ClearSelection();
         }
     }

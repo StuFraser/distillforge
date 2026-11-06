@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using DistillForge.Core.Extraction;
 using DistillForge.Core.Segmentation;
 using DistillForge.Core.Text;
 
@@ -28,19 +29,28 @@ public static class ExtractionPrompt
         If there are no action points, respond with {"action_points":[]}.
         """;
 
-    public static string BuildUserMessage(IReadOnlyList<Segment> segments)
+    private const string PartialNotice =
+        "This is part {0} of {1} of a longer document. Neighbouring parts overlap, so you only see some of the segments. " +
+        "Report only action points supported by the segments below.\n\n";
+
+    public static string BuildUserMessage(ExtractionWindow window)
     {
-        var sb = new StringBuilder("Source segments:\n\n");
-        foreach (var s in segments)
+        var sb = new StringBuilder();
+        if (window.Count > 1) sb.AppendFormat(PartialNotice, window.Index, window.Count);
+        sb.Append("Source segments:\n\n");
+        foreach (var s in window.Segments)
         {
             sb.Append('[').Append(s.Label).Append("] ").Append(s.Text).Append("\n\n");
         }
         return sb.ToString();
     }
 
-    /// <summary>Rough prompt size: system + segments + ~8 tokens of label/separator overhead per segment.</summary>
+    /// <summary>Prompt tokens that aren't segment text: system prompt, headings and the multi-part notice.</summary>
+    public static int FixedOverhead { get; } = TokenEstimator.Estimate(System) + 20 + TokenEstimator.Estimate(PartialNotice) + 8;
+
+    /// <summary>Rough prompt size: fixed overhead + segments + per-segment label/separator overhead.</summary>
     public static int EstimateTokens(IReadOnlyList<Segment> segments) =>
-        TokenEstimator.Estimate(System) + 20 + segments.Sum(s => s.TokenEstimate + 8);
+        FixedOverhead + segments.Sum(s => s.TokenEstimate + WindowPlanner.PerSegmentOverhead);
 
     /// <summary>JSON schema for response_format: json_schema. Strict mode requires every property listed as required.</summary>
     public static JsonObject Schema() => new()

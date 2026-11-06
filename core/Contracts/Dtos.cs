@@ -8,13 +8,20 @@ public sealed record CreateWorkspaceRequest(string SourceText, string? Title = n
 
 public sealed record ReplaceSourceRequest(string SourceText, SegmentationStrategyKind? Strategy = null);
 
-public sealed record WorkspaceSummaryDto(Guid Id, string Title, DateTimeOffset CreatedAt);
+public sealed record WorkspaceSummaryDto(
+    Guid Id,
+    string Title,
+    bool IsArchived,
+    int ActionItemCount,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
 
 public sealed record WorkspaceDto(
     Guid Id,
     string Title,
     string SourceText,
     SegmentationStrategyKind Strategy,
+    bool IsArchived,
     DateTimeOffset CreatedAt,
     IReadOnlyList<SegmentDto> Segments);
 
@@ -42,6 +49,14 @@ public enum ExtractionRunStatus
     Failed,
 }
 
+/// <summary>What a running extraction is currently doing. Pass 1 = Extracting (window by window), pass 2 = Consolidating.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<ExtractionPhase>))]
+public enum ExtractionPhase
+{
+    Extracting,
+    Consolidating,
+}
+
 public sealed record ExtractionRunDto(
     Guid Id,
     Guid WorkspaceId,
@@ -53,4 +68,7 @@ public sealed record ExtractionRunDto(
     string? Error,
     string? Warnings,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt,
+    ExtractionPhase? Phase = null,
+    int? WindowIndex = null,
+    int? WindowCount = null);

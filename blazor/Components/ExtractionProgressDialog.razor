@@ -1,0 +1,91 @@
+@implements IDisposable
+
+<div class="dialog-backdrop">
+    <div class="dialog progress-dialog" role="dialog" aria-modal="true" aria-live="polite" aria-labelledby="progress-title">
+        <div class="progress-head">
+            <span class="spinner" aria-hidden="true"></span>
+            <h2 id="progress-title">Extracting action points</h2>
+        </div>
+
+        <ol class="passes">
+            <li class="pass @Pass1State">
+                <span class="pass-marker" aria-hidden="true">@(Pass1State == "done" ? "✓" : "1")</span>
+                <div class="pass-body">
+                    <div class="pass-title">
+                        <strong>Pass 1 · Extracting</strong>
+                        <span class="muted">@Pass1Detail</span>
+                    </div>
+                    @if (Run.WindowCount is > 0)
+                    {
+                        <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="@Run.WindowCount" aria-valuenow="@CompletedWindows">
+                            <div class="bar-fill @(Pass1State == "active" ? "working" : "")" style="width:@Pass1Percent%"></div>
+                        </div>
+                    }
+                </div>
+            </li>
+            @if (Run.WindowCount is > 1)
+            {
+                <li class="pass @Pass2State">
+                    <span class="pass-marker" aria-hidden="true">2</span>
+                    <div class="pass-body">
+                        <div class="pass-title">
+                            <strong>Pass 2 · Consolidating</strong>
+                            <span class="muted">@(Pass2State == "active" ? "Looking for duplicate notes across windows…" : "Merges duplicates found in more than one window")</span>
+                        </div>
+                        @if (Pass2State == "active")
+                        {
+                            <div class="bar"><div class="bar-fill working indeterminate"></div></div>
+                        }
+                    </div>
+                </li>
+            }
+        </ol>
+
+        <div class="dialog-actions progress-footer">
+            <span class="muted">Elapsed @Elapsed.ToString(@"m\:ss")</span>
+            <button type="button" class="secondary" @onclick="OnHide" title="Keep working; progress stays in the Uncategorised header">Hide</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ExtractionRunDto Run { get; set; } = default!;
+    [Parameter] public EventCallback OnHide { get; set; }
+
+    private readonly DateTime _started = DateTime.UtcNow;
+    private readonly CancellationTokenSource _cts = new();
+
+    private TimeSpan Elapsed => DateTime.UtcNow - _started;
+    private bool Consolidating => Run.Phase == ExtractionPhase.Consolidating;
+
+    // Window being worked on is Run.WindowIndex; windows before it are complete.
+    private int CompletedWindows => Consolidating ? Run.WindowCount ?? 0 : Math.Max(0, (Run.WindowIndex ?? 1) - 1);
+    private double Pass1Percent => Run.WindowCount is > 0 ? Math.Round(100.0 * CompletedWindows / Run.WindowCount.Value, 1) : 0;
+    private string Pass1State => Consolidating ? "done" : "active";
+    private string Pass2State => Consolidating ? "active" : "pending";
+
+    private string Pass1Detail =>
+        Run.Status == ExtractionRunStatus.Queued || Run.Phase is null ? (Run.Status == ExtractionRunStatus.Queued ? "Waiting to start…" : "Preparing…")
+        : Consolidating ? $"{Run.WindowCount} of {Run.WindowCount} windows done"
+        : Run.WindowCount is > 1 ? $"Window {Run.WindowIndex} of {Run.WindowCount}"
+        : "Reading the document…";
+
+    protected override void OnInitialized() => _ = Tick();
+
+    // Keeps the elapsed clock moving between status polls.
+    private async Task Tick()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_cts.Token)) StateHasChanged();
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+}
