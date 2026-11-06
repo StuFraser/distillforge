@@ -1,0 +1,57 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // Starts Azurite (queue storage for the extraction trigger) unless something is already
+      // listening on the queue port, e.g. Azurite running in a terminal. Stays running after debugging stops.
+      "label": "azurite",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "if (exec 3<>/dev/tcp/127.0.0.1/10001) 2>/dev/null; then echo 'Azurite already running on :10001'; exec sleep infinity; else exec npx --yes azurite --silent --location \"$HOME/.azurite\"; fi"
+      ],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "azurite",
+        "pattern": { "regexp": "^__no_problems__$" },
+        "background": {
+          "activeBegins": true,
+          "beginsPattern": "^",
+          "endsPattern": "(Azurite Queue service is successfully listening|Azurite already running)"
+        }
+      },
+      "presentation": { "reveal": "silent", "panel": "dedicated" }
+    },
+    {
+      "label": "build (functions)",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
+      "options": { "cwd": "${workspaceFolder}/api" },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      // Label is "func: host start". The Azure Functions extension's pickProcess command starts this
+      // task and attaches to the isolated worker process once it is up.
+      "type": "func",
+      "command": "host start",
+      "options": { "cwd": "${workspaceFolder}/api/bin/Debug/net10.0" },
+      "dependsOn": ["azurite", "build (functions)"],
+      "isBackground": true,
+      "problemMatcher": "$func-dotnet-watch"
+    },
+    {
+      // Holds the Blazor launch until the Functions host is accepting requests on :7071 (gives up after 3 minutes).
+      "label": "wait for api",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "for i in $(seq 1 180); do (exec 3<>/dev/tcp/127.0.0.1/7071) 2>/dev/null && { echo 'API is up'; exit 0; }; sleep 1; done; echo 'Timed out waiting for the API on :7071'; exit 1"
+      ],
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent" }
+    }
+  ]
+}

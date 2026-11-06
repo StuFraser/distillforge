@@ -122,9 +122,11 @@ Then edit `api/local.settings.json`:
 
 ```bash
 dotnet tool restore
-export ConnectionStrings__Postgres="Host=…;Database=distillforge;Username=…;Password=…"
 dotnet ef database update --project data --startup-project api
 ```
+
+`dotnet ef` reads the connection string from `api/local.settings.json`. A
+`ConnectionStrings__Postgres` environment variable, if set, takes precedence (useful in CI).
 
 ### 4. Run
 

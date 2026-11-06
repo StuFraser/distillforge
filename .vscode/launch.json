@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Starts Azurite + the Functions host (via the func task) and attaches to the API worker.
+      "name": "API (Functions)",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:azureFunctions.pickProcess}"
+    },
+    {
+      // Runs the Blazor dev server (http profile, port 5189) and opens Chrome with WASM debugging.
+      "name": "UI (Blazor WASM)",
+      "type": "blazorwasm",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/blazor",
+      "url": "http://localhost:5189",
+      "browser": "chrome",
+      "preLaunchTask": "wait for api"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "DistillForge: All",
+      "configurations": ["API (Functions)", "UI (Blazor WASM)"],
+      "stopAll": true
+    }
+  ]
+}

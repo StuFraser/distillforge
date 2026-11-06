@@ -56,7 +56,7 @@ Key feature is that extracted notes can be linked back to relevant passages in s
 - Restore tools (dotnet-ef): `dotnet tool restore`
 - Queue storage for the API: `npx azurite` (or `docker compose up azurite`)
 - Apply migrations: `dotnet ef database update --project data --startup-project api`
-  (reads `ConnectionStrings__Postgres` from the environment)
+  (reads `ConnectionStrings__Postgres` from `api/local.settings.json`; an env var of the same name overrides it)
 - Run API: `cd api && func start`
 - Run front end: `cd blazor && dotnet watch`
 - Tests: `dotnet test`
