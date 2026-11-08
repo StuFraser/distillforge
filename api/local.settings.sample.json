@@ -4,6 +4,7 @@
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "ConnectionStrings__Postgres": "Host=<postgres-host>;Port=5432;Database=distillforge;Username=<user>;Password=<password>",
+    "Encryption__Key": "<32 random bytes, base64: openssl rand -base64 32>",
     "AiProvider__BaseUrl": "http://<ollama-host>:11434/v1",
     "AiProvider__Model": "llama3.1:8b",
     "AiProvider__ApiKey": "ollama",

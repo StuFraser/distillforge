@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject DistillForgeApi Api
 @inject IJSRuntime JS
+@inject AiSettingsState AiState
 
 <PageTitle>DistillForge</PageTitle>
 
@@ -71,6 +72,14 @@
             else
             {
                 <button type="button" class="add-source" @onclick="OpenReplace" disabled="@IsExtracting">Replace Source</button>
+                <select class="model-picker" aria-label="AI model for extraction" title="Model used for the next extraction"
+                        @bind="ChosenModel" disabled="@IsExtracting">
+                    <option value="">@DefaultModelLabel</option>
+                    @foreach (var m in _models)
+                    {
+                        <option value="@m.Id">@m.Label</option>
+                    }
+                </select>
                 <button type="button" class="secondary" @onclick="ConfirmReextract" disabled="@IsExtracting">Re-extract</button>
             }
         </footer>
@@ -94,7 +103,7 @@
                 else if (_run?.Status == ExtractionRunStatus.Succeeded)
                 {
                     <span class="status ok" title="@_run.Warnings">
-                        @_run.ActionItemCount found@(_run.PromptTokens is int p ? $" · {p:N0} prompt tokens" : "")@(string.IsNullOrEmpty(_run.Warnings) ? "" : " · warnings")
+                        @_run.ActionItemCount found@(string.IsNullOrEmpty(_run.Model) ? "" : $" · {_run.Model}")@(_run.PromptTokens is int p ? $" · {p:N0} prompt tokens" : "")@(string.IsNullOrEmpty(_run.Warnings) ? "" : " · warnings")
                     </span>
                 }
             </header>
@@ -224,7 +233,7 @@
 
 @if (_showDialog)
 {
-    <AddSourceDialog IsReplace="_replacing" Busy="_saving" OnSubmit="SubmitSource" OnCancel="() => _showDialog = false" />
+    <AddSourceDialog IsReplace="_replacing" Models="_models" ModelId="_chosenModelId" Busy="_saving" OnSubmit="SubmitSource" OnCancel="() => _showDialog = false" />
 }
 
 @code {
@@ -419,8 +428,37 @@
 
     private bool IsExtracting => _run?.Status is ExtractionRunStatus.Queued or ExtractionRunStatus.Running;
 
+    // ---- AI model choice ----
+    private List<AiModelChoiceDto> _models = [];
+    private Guid? _chosenModelId; // null = let the server pick (last used, else default)
+
+    private string ChosenModel
+    {
+        get => _chosenModelId?.ToString() ?? "";
+        set => _chosenModelId = Guid.TryParse(value, out var id) ? id : null;
+    }
+
+    private string DefaultModelLabel => _models.FirstOrDefault(m => m.IsDefault) is { } d ? $"Default: {d.Label}" : "Default (server config)";
+
+    private async Task ReloadModels()
+    {
+        try
+        {
+            _models = await Api.GetAiModelChoicesAsync(_cts.Token);
+            if (_chosenModelId is Guid id && !_models.Any(m => m.Id == id)) _chosenModelId = null;
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        StateHasChanged();
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        AiState.Changed += OnAiSettingsChanged;
+        try
+        {
+            _models = await Api.GetAiModelChoicesAsync(_cts.Token);
+        }
+        catch (ApiException ex) { _error = ex.Message; }
         try
         {
             await RefreshList();
@@ -442,6 +480,8 @@
         _run = _workspace is null ? null : await Api.GetLatestRunAsync(id, _cts.Token);
         _categories = _workspace is null ? [] : await Api.GetCategoriesAsync(id, _cts.Token);
         _activeCategoryId = null;
+        // Preselect the model this workspace last used (if it still exists).
+        _chosenModelId = _run?.AiModelId is Guid last && _models.Any(m => m.Id == last) ? last : null;
         ResetFilters();
         ClearSelection();
         // A run left in flight (e.g. page refreshed mid-extraction) is picked up again.
@@ -506,8 +546,9 @@
 
     private void OpenReplace() { _replacing = true; _showDialog = true; }
 
-    private async Task SubmitSource((string Text, SegmentationStrategyKind? Strategy) input)
+    private async Task SubmitSource((string Text, SegmentationStrategyKind? Strategy, Guid? ModelId) input)
     {
+        _chosenModelId = input.ModelId;
         _saving = true;
         try
         {
@@ -541,7 +582,7 @@
         try
         {
             _progressHidden = false;
-            _run = await Api.StartExtractionAsync(_workspace.Id, _cts.Token);
+            _run = await Api.StartExtractionAsync(_workspace.Id, _chosenModelId, _cts.Token);
             StateHasChanged();
             await PollRun();
         }
@@ -588,8 +629,11 @@
         await JS.InvokeVoidAsync("distillforge.scrollToFirstHighlight", "source-text");
     }
 
+    private void OnAiSettingsChanged() => _ = ReloadModels();
+
     public void Dispose()
     {
+        AiState.Changed -= OnAiSettingsChanged;
         _cts.Cancel();
         _cts.Dispose();
     }

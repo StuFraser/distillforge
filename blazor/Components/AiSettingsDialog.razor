@@ -1,0 +1,389 @@
+@inject DistillForgeApi Api
+@implements IDisposable
+
+<div class="dialog-backdrop" @onclick="Close">
+    <div class="dialog ai-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-title" @onclick:stopPropagation="true">
+        <h2 id="ai-title">AI providers and models</h2>
+
+        @if (_error is not null)
+        {
+            <p class="warning error" role="alert">@_error</p>
+        }
+
+        @if (_view == View.List)
+        {
+            <p class="muted">
+                Connect any OpenAI-compatible endpoint (Ollama, LM Studio, OpenAI, OpenRouter…). Each provider has one or more models;
+                you pick the model for each extraction. API keys are encrypted on the server and never shown again.
+            </p>
+
+            @if (_loading)
+            {
+                <p class="muted">Loading…</p>
+            }
+            else if (_providers.Count == 0)
+            {
+                <p class="empty-hint">No providers yet. Without one, the server's <code>AiProvider__*</code> settings are used.</p>
+            }
+
+            @foreach (var p in _providers)
+            {
+                <div class="provider-card">
+                    <div class="provider-head">
+                        <div>
+                            <strong>@p.Name</strong>
+                            <div class="muted small">@p.BaseUrl · @(p.HasApiKey ? "key saved" : "no key")</div>
+                        </div>
+                        <div class="provider-actions">
+                            <button type="button" class="secondary" @onclick="() => EditProvider(p)">Edit</button>
+                            <button type="button" class="secondary" @onclick="() => DeleteProvider(p)">Delete</button>
+                        </div>
+                    </div>
+                    <ul class="model-list">
+                        @foreach (var m in p.Models)
+                        {
+                            <li>
+                                <span>
+                                    @(m.DisplayName ?? m.ModelId)
+                                    @if (m.DisplayName is not null) { <span class="muted small">(@m.ModelId)</span> }
+                                    @if (m.IsDefault) { <span class="chip">default</span> }
+                                </span>
+                                <span class="muted small">@m.ContextTokens.ToString("N0") ctx · @m.ResponseFormat</span>
+                                <span class="provider-actions">
+                                    @if (!m.IsDefault)
+                                    {
+                                        <button type="button" class="link" @onclick="() => MakeDefault(m)">Make default</button>
+                                    }
+                                    <button type="button" class="link" @onclick="() => EditModel(p, m)">Edit</button>
+                                    <button type="button" class="link" @onclick="() => DeleteModel(m)">Delete</button>
+                                </span>
+                            </li>
+                        }
+                        @if (p.Models.Count == 0)
+                        {
+                            <li class="muted small">No models yet.</li>
+                        }
+                    </ul>
+                    <button type="button" class="link" @onclick="() => EditModel(p, null)">＋ Add model</button>
+                </div>
+            }
+
+            <div class="dialog-actions">
+                <button type="button" class="secondary" @onclick="EditProvider0">＋ Add provider</button>
+                <button type="button" class="primary" @onclick="Close">Done</button>
+            </div>
+        }
+        else if (_view == View.Provider)
+        {
+            <h3>@(_editingProvider is null ? "New provider" : "Edit provider")</h3>
+
+            @if (_editingProvider is null)
+            {
+                <label for="p-preset">Preset</label>
+                <select id="p-preset" @onchange="OnPreset">
+                    <option value="">Custom</option>
+                    @foreach (var preset in Presets)
+                    {
+                        <option value="@preset.Name">@preset.Name</option>
+                    }
+                </select>
+            }
+
+            <label for="p-name">Name</label>
+            <input id="p-name" type="text" maxlength="@AiValidation.MaxName" @bind="_pName" @bind:event="oninput" disabled="@_busy" placeholder="e.g. Home Ollama" />
+
+            <label for="p-url">Base URL <span class="muted small">(include /v1)</span></label>
+            <input id="p-url" type="text" @bind="_pUrl" @bind:event="oninput" disabled="@_busy" placeholder="http://localhost:11434/v1" />
+
+            <label for="p-key">API key</label>
+            @if (!KeyInputShown)
+            {
+                <div class="dialog-row">
+                    <span class="muted">A key is saved.</span>
+                    <button type="button" class="link" @onclick="() => _replaceKey = true">Replace</button>
+                    <button type="button" class="link" @onclick="ClearKey">Remove</button>
+                </div>
+            }
+            else
+            {
+                <input id="p-key" type="password" autocomplete="off" @bind="_pKey" @bind:event="oninput" disabled="@_busy"
+                       placeholder="@(_editingProvider is null ? "Leave blank if the endpoint needs none (Ollama)" : "Enter a new key")" />
+            }
+
+            <div class="field-row">
+                <div>
+                    <label for="p-timeout">Timeout (seconds)</label>
+                    <input id="p-timeout" type="number" min="@AiValidation.MinTimeout" max="@AiValidation.MaxTimeout" @bind="_pTimeout" disabled="@_busy" />
+                </div>
+                <div class="test-cell">
+                    <button type="button" class="secondary" @onclick="TestConnection" disabled="@(_busy || AiValidation.BaseUrlError(_pUrl) is not null)">
+                        @(_testing ? "Testing…" : "Test connection")
+                    </button>
+                </div>
+            </div>
+            @if (_testResult is not null)
+            {
+                <p class="@(_testResult.Ok ? "ok-note" : "warning error")">
+                    @if (_testResult.Ok)
+                    {
+                        <text>Connected. @(_testResult.Models.Count > 0 ? $"{_testResult.Models.Count} model(s) found." : "") @_testResult.Error</text>
+                    }
+                    else { @_testResult.Error }
+                </p>
+            }
+
+            <div class="dialog-actions">
+                <button type="button" class="secondary" @onclick="BackToList" disabled="@_busy">Cancel</button>
+                <button type="button" class="primary" @onclick="SaveProvider" disabled="@(_busy || AiValidation.ValidateProvider(BuildProvider()) is not null)">
+                    @(_busy ? "Saving…" : "Save")
+                </button>
+            </div>
+        }
+        else
+        {
+            <h3>@(_editingModel is null ? "Add model" : "Edit model") <span class="muted small">on @_modelProvider!.Name</span></h3>
+
+            <label for="m-id">Model ID</label>
+            <input id="m-id" type="text" list="m-options" @bind="_mId" @bind:event="oninput" disabled="@_busy" placeholder="e.g. llama3.1:8b" />
+            <datalist id="m-options">
+                @foreach (var id in _discovered)
+                {
+                    <option value="@id"></option>
+                }
+            </datalist>
+            @if (_discoverNote is not null)
+            {
+                <span class="muted small">@_discoverNote</span>
+            }
+
+            <label for="m-name">Display name <span class="muted small">(optional)</span></label>
+            <input id="m-name" type="text" maxlength="@AiValidation.MaxDisplayName" @bind="_mName" @bind:event="oninput" disabled="@_busy" />
+
+            <div class="field-row">
+                <div>
+                    <label for="m-ctx">Context window (tokens)</label>
+                    <input id="m-ctx" type="number" @bind="_mCtx" disabled="@_busy" />
+                </div>
+                <div>
+                    <label for="m-res">Reserved for output (tokens)</label>
+                    <input id="m-res" type="number" @bind="_mRes" disabled="@_busy" />
+                </div>
+            </div>
+            <p class="muted small">
+                Context size can't be discovered from the API; use what the server actually runs the model with
+                (for Ollama that's <code>num_ctx</code>, not the model's maximum). Documents are split into windows to fit.
+            </p>
+
+            <label for="m-fmt">Structured output</label>
+            <select id="m-fmt" @bind="_mFmt" disabled="@_busy">
+                <option value="@ResponseFormatMode.JsonSchema">JSON schema (most reliable; Ollama, OpenAI, LM Studio)</option>
+                <option value="@ResponseFormatMode.JsonObject">JSON object (backends without schema support)</option>
+                <option value="@ResponseFormatMode.None">None (prompt only, retry on bad JSON)</option>
+            </select>
+
+            <label class="check"><input type="checkbox" @bind="_mDefault" disabled="@(_busy || _editingModel?.IsDefault == true)" /> Use as the default model</label>
+
+            <div class="dialog-actions">
+                <button type="button" class="secondary" @onclick="BackToList" disabled="@_busy">Cancel</button>
+                <button type="button" class="primary" @onclick="SaveModel" disabled="@(_busy || AiValidation.ValidateModel(BuildModel()) is not null)">
+                    @(_busy ? "Saving…" : "Save")
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private enum View { List, Provider, Model }
+
+    private sealed record Preset(string Name, string Url);
+    private static readonly Preset[] Presets =
+    [
+        new("Ollama (local)", "http://localhost:11434/v1"),
+        new("LM Studio (local)", "http://localhost:1234/v1"),
+        new("OpenAI", "https://api.openai.com/v1"),
+        new("OpenRouter", "https://openrouter.ai/api/v1"),
+    ];
+
+    private readonly CancellationTokenSource _cts = new();
+    private View _view = View.List;
+    private List<AiProviderDto> _providers = [];
+    private bool _loading = true, _busy, _testing, _replaceKey;
+    private string? _error;
+
+    // provider form
+    private AiProviderDto? _editingProvider;
+    private string _pName = "", _pUrl = "", _pKey = "";
+    private int _pTimeout = 300;
+    private DiscoverModelsResponse? _testResult;
+
+    // model form
+    private AiProviderDto? _modelProvider;
+    private AiModelDto? _editingModel;
+    private string _mId = "", _mName = "";
+    private int _mCtx = 8192, _mRes = 2048;
+    private ResponseFormatMode _mFmt = ResponseFormatMode.JsonSchema;
+    private bool _mDefault;
+    private List<string> _discovered = [];
+    private string? _discoverNote;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+        _loading = false;
+    }
+
+    private async Task Reload()
+    {
+        try { _providers = await Api.GetAiProvidersAsync(_cts.Token); }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
+    private Task Close() => _busy ? Task.CompletedTask : OnClose.InvokeAsync();
+
+    private void BackToList() { _view = View.List; _error = null; }
+
+    // ---- providers ----
+    private void EditProvider0() => EditProvider(null);
+
+    private void EditProvider(AiProviderDto? p)
+    {
+        _error = null;
+        _editingProvider = p;
+        _pName = p?.Name ?? "";
+        _pUrl = p?.BaseUrl ?? "";
+        _pKey = "";
+        _pTimeout = p?.TimeoutSeconds ?? 300;
+        _replaceKey = false;
+        _clearKey = false;
+        _testResult = null;
+        _view = View.Provider;
+    }
+
+    private void OnPreset(ChangeEventArgs e)
+    {
+        if (Presets.FirstOrDefault(p => p.Name == e.Value?.ToString()) is { } preset)
+        {
+            _pUrl = preset.Url;
+            if (string.IsNullOrWhiteSpace(_pName)) _pName = preset.Name.Replace(" (local)", "");
+        }
+    }
+
+    private bool _clearKey;
+    private void ClearKey() { _clearKey = true; _replaceKey = true; _pKey = ""; }
+
+    /// <summary>null = keep stored key; "" = clear; otherwise replace.</summary>
+    private bool KeyInputShown => !(_editingProvider?.HasApiKey == true && !_replaceKey);
+
+    private string? TypedKey => KeyInputShown && !string.IsNullOrWhiteSpace(_pKey) ? _pKey : null;
+
+    private string? KeyForRequest => _clearKey ? "" : TypedKey;
+
+    private AiProviderRequest BuildProvider() => new(_pName.Trim(), _pUrl.Trim(), KeyForRequest, _pTimeout);
+
+    private async Task TestConnection()
+    {
+        _testing = true;
+        _testResult = null;
+        try
+        {
+            // If the user hasn't typed a new key, reuse the stored one (server side).
+            _testResult = await Api.DiscoverModelsAsync(new DiscoverModelsRequest(_pUrl.Trim(), _clearKey ? "" : TypedKey, _editingProvider?.Id), _cts.Token);
+        }
+        catch (ApiException ex) { _testResult = new DiscoverModelsResponse(false, [], ex.Message); }
+        finally { _testing = false; }
+    }
+
+    private async Task SaveProvider()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var req = BuildProvider();
+            if (_editingProvider is null) await Api.CreateAiProviderAsync(req, _cts.Token);
+            else await Api.UpdateAiProviderAsync(_editingProvider.Id, req, _cts.Token);
+            _clearKey = false;
+            await Reload();
+            _view = View.List;
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task DeleteProvider(AiProviderDto p)
+    {
+        if (!await Confirm($"Delete provider “{p.Name}” and its {p.Models.Count} model(s)? Past extractions keep their results.")) return;
+        await Run(async () => { await Api.DeleteAiProviderAsync(p.Id, _cts.Token); await Reload(); });
+    }
+
+    // ---- models ----
+    private async Task EditModel(AiProviderDto p, AiModelDto? m)
+    {
+        _error = null;
+        _modelProvider = p;
+        _editingModel = m;
+        _mId = m?.ModelId ?? "";
+        _mName = m?.DisplayName ?? "";
+        _mCtx = m?.ContextTokens ?? 8192;
+        _mRes = m?.ReserveOutput ?? 2048;
+        _mFmt = m?.ResponseFormat ?? ResponseFormatMode.JsonSchema;
+        _mDefault = m?.IsDefault ?? false;
+        _discovered = [];
+        _discoverNote = "Looking up the provider's models…";
+        _view = View.Model;
+        StateHasChanged();
+
+        try
+        {
+            var r = await Api.DiscoverModelsAsync(new DiscoverModelsRequest(p.BaseUrl, null, p.Id), _cts.Token);
+            _discovered = r.Models.ToList();
+            _discoverNote = r.Ok
+                ? (_discovered.Count > 0 ? $"{_discovered.Count} model(s) available: start typing or pick from the list." : r.Error)
+                : $"Couldn't list models ({r.Error}) — type the ID by hand.";
+        }
+        catch (ApiException) { _discoverNote = null; }
+    }
+
+    private AiModelRequest BuildModel() => new(_mId.Trim(), string.IsNullOrWhiteSpace(_mName) ? null : _mName.Trim(), _mCtx, _mRes, _mFmt, _mDefault);
+
+    private async Task SaveModel()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var req = BuildModel();
+            if (_editingModel is null) await Api.CreateAiModelAsync(_modelProvider!.Id, req, _cts.Token);
+            else await Api.UpdateAiModelAsync(_editingModel.Id, req, _cts.Token);
+            await Reload();
+            _view = View.List;
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private Task MakeDefault(AiModelDto m) => Run(async () =>
+    {
+        await Api.UpdateAiModelAsync(m.Id, new AiModelRequest(m.ModelId, m.DisplayName, m.ContextTokens, m.ReserveOutput, m.ResponseFormat, true), _cts.Token);
+        await Reload();
+    });
+
+    private async Task DeleteModel(AiModelDto m)
+    {
+        if (!await Confirm($"Delete model “{m.DisplayName ?? m.ModelId}”?")) return;
+        await Run(async () => { await Api.DeleteAiModelAsync(m.Id, _cts.Token); await Reload(); });
+    }
+
+    private async Task Run(Func<Task> action)
+    {
+        _error = null;
+        try { await action(); }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    private async Task<bool> Confirm(string message) => await JS.InvokeAsync<bool>("confirm", message);
+
+    public void Dispose() { _cts.Cancel(); _cts.Dispose(); }
+}

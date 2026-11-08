@@ -54,10 +54,43 @@ public sealed class DistillForgeApi(HttpClient http)
         await Send<ActionItemDto>(() => http.PutAsJsonAsync($"actions/{id}/category", new MoveActionItemRequest(categoryId), ct), ct)
         ?? throw new ApiException("That note no longer exists (the workspace may have been re-extracted).");
 
-    /// <summary>Starts a run (202), or returns the run already in progress (409).</summary>
-    public async Task<ExtractionRunDto> StartExtractionAsync(Guid workspaceId, CancellationToken ct = default)
+    // ---- AI providers and models ----
+
+    public async Task<List<AiProviderDto>> GetAiProvidersAsync(CancellationToken ct = default) =>
+        await Send<List<AiProviderDto>>(() => http.GetAsync("ai/providers", ct), ct) ?? [];
+
+    public async Task<List<AiModelChoiceDto>> GetAiModelChoicesAsync(CancellationToken ct = default) =>
+        await Send<List<AiModelChoiceDto>>(() => http.GetAsync("ai/models", ct), ct) ?? [];
+
+    public async Task<AiProviderDto> CreateAiProviderAsync(AiProviderRequest r, CancellationToken ct = default) =>
+        (await Send<AiProviderDto>(() => http.PostAsJsonAsync("ai/providers", r, ct), ct))!;
+
+    public async Task<AiProviderDto> UpdateAiProviderAsync(Guid id, AiProviderRequest r, CancellationToken ct = default) =>
+        await Send<AiProviderDto>(() => http.PutAsJsonAsync($"ai/providers/{id}", r, ct), ct) ?? throw new ApiException("That provider no longer exists.");
+
+    public Task DeleteAiProviderAsync(Guid id, CancellationToken ct = default) => Delete($"ai/providers/{id}", ct);
+
+    public async Task<AiModelDto> CreateAiModelAsync(Guid providerId, AiModelRequest r, CancellationToken ct = default) =>
+        await Send<AiModelDto>(() => http.PostAsJsonAsync($"ai/providers/{providerId}/models", r, ct), ct) ?? throw new ApiException("That provider no longer exists.");
+
+    public async Task<AiModelDto> UpdateAiModelAsync(Guid id, AiModelRequest r, CancellationToken ct = default) =>
+        await Send<AiModelDto>(() => http.PutAsJsonAsync($"ai/models/{id}", r, ct), ct) ?? throw new ApiException("That model no longer exists.");
+
+    public Task DeleteAiModelAsync(Guid id, CancellationToken ct = default) => Delete($"ai/models/{id}", ct);
+
+    public async Task<DiscoverModelsResponse> DiscoverModelsAsync(DiscoverModelsRequest r, CancellationToken ct = default) =>
+        (await Send<DiscoverModelsResponse>(() => http.PostAsJsonAsync("ai/discover", r, ct), ct))!;
+
+    private async Task Delete(string url, CancellationToken ct)
     {
-        using var response = await http.PostAsync($"workspaces/{workspaceId}/extract", null, ct);
+        using var response = await http.DeleteAsync(url, ct);
+        if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound) throw await ToException(response, ct);
+    }
+
+    /// <summary>Starts a run (202), or returns the run already in progress (409). A null model means the server picks (last used, else default).</summary>
+    public async Task<ExtractionRunDto> StartExtractionAsync(Guid workspaceId, Guid? aiModelId = null, CancellationToken ct = default)
+    {
+        using var response = await http.PostAsJsonAsync($"workspaces/{workspaceId}/extract", new StartExtractionRequest(aiModelId), ct);
         if (response.StatusCode is HttpStatusCode.Accepted or HttpStatusCode.Conflict)
             return (await response.Content.ReadFromJsonAsync<ExtractionRunDto>(ct))!;
         throw await ToException(response, ct);

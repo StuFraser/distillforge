@@ -23,6 +23,17 @@
             <span class="muted">@_text.Length.ToString("N0") chars</span>
         </div>
 
+        <div class="dialog-row">
+            <label for="source-model">AI model</label>
+            <select id="source-model" @bind="_model">
+                <option value="">@(Models.Any(m => m.IsDefault) ? "Default" : "Default (from server config)")</option>
+                @foreach (var m in Models)
+                {
+                    <option value="@m.Id">@m.Label@(m.IsDefault ? " (default)" : "")</option>
+                }
+            </select>
+        </div>
+
         <div class="dialog-actions">
             <button type="button" class="secondary" @onclick="Cancel" disabled="@Busy">Cancel</button>
             <button type="button" class="primary" @onclick="Submit" disabled="@(Busy || string.IsNullOrWhiteSpace(_text))">
@@ -35,16 +46,21 @@
 @code {
     [Parameter] public bool IsReplace { get; set; }
     [Parameter] public bool Busy { get; set; }
-    [Parameter] public EventCallback<(string Text, SegmentationStrategyKind? Strategy)> OnSubmit { get; set; }
+    [Parameter] public EventCallback<(string Text, SegmentationStrategyKind? Strategy, Guid? ModelId)> OnSubmit { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public IReadOnlyList<AiModelChoiceDto> Models { get; set; } = [];
+    [Parameter] public Guid? ModelId { get; set; }
 
     private string _text = "";
     private string _strategy = "";
+    private string _model = "";
+
+    protected override void OnInitialized() => _model = ModelId?.ToString() ?? "";
 
     private Task Submit()
     {
         SegmentationStrategyKind? strategy = Enum.TryParse<SegmentationStrategyKind>(_strategy, out var s) ? s : null;
-        return OnSubmit.InvokeAsync((_text, strategy));
+        return OnSubmit.InvokeAsync((_text, strategy, Guid.TryParse(_model, out var m) ? m : null));
     }
 
     private Task Cancel() => Busy ? Task.CompletedTask : OnCancel.InvokeAsync();

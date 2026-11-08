@@ -99,6 +99,9 @@ public class ExtractionRun
     public string? Warnings { get; set; }
 
     // Live progress, updated as the run works through its passes.
+    /// <summary>The model the run was asked to use. Null once that model is deleted (the Model string keeps the history) or when the default/config fallback was used.</summary>
+    public Guid? AiModelId { get; set; }
+
     public ExtractionPhase? Phase { get; set; }
     public int? WindowIndex { get; set; }
     public int? WindowCount { get; set; }
@@ -108,4 +111,35 @@ public class ExtractionRun
     public DateTimeOffset? CompletedAt { get; set; }
 
     public Workspace? Workspace { get; set; }
+}
+
+/// <summary>An OpenAI-compatible endpoint (Ollama, LM Studio, OpenAI, OpenRouter...). Owner column arrives with auth.</summary>
+public class AiProvider
+{
+    public Guid Id { get; set; }
+    public required string Name { get; set; }
+    /// <summary>Includes the version path, e.g. http://host:11434/v1. Stored without a trailing slash.</summary>
+    public required string BaseUrl { get; set; }
+    /// <summary>Encrypted (see SecretProtector). Never returned to the client.</summary>
+    public string? ApiKeyEncrypted { get; set; }
+    public int TimeoutSeconds { get; set; } = 300;
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public List<AiModel> Models { get; set; } = [];
+}
+
+/// <summary>A model on a provider, with the limits that are properties of the model rather than the endpoint.</summary>
+public class AiModel
+{
+    public Guid Id { get; set; }
+    public Guid AiProviderId { get; set; }
+    public required string ModelId { get; set; }
+    public string? DisplayName { get; set; }
+    public int ContextTokens { get; set; } = 8192;
+    public int ReserveOutput { get; set; } = 2048;
+    public ResponseFormatMode ResponseFormat { get; set; } = ResponseFormatMode.JsonSchema;
+    /// <summary>At most one model is the default (enforced by a partial unique index).</summary>
+    public bool IsDefault { get; set; }
+
+    public AiProvider? Provider { get; set; }
 }

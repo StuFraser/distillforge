@@ -11,6 +11,8 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
     public DbSet<ActionItem> ActionItems => Set<ActionItem>();
     public DbSet<Evidence> Evidence => Set<Evidence>();
     public DbSet<ExtractionRun> ExtractionRuns => Set<ExtractionRun>();
+    public DbSet<AiProvider> AiProviders => Set<AiProvider>();
+    public DbSet<AiModel> AiModels => Set<AiModel>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -61,7 +63,26 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             e.Property(x => x.Model).HasMaxLength(200);
             e.Property(x => x.Phase).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.FinishReason).HasMaxLength(32);
+            // Deleting a model keeps the run (and its Model string) but forgets which config produced it.
+            e.HasOne<AiModel>().WithMany().HasForeignKey(x => x.AiModelId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(x => x.Workspace).WithMany(w => w.ExtractionRuns).HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<AiProvider>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(100);
+            e.Property(x => x.BaseUrl).HasMaxLength(500);
+            e.Property(x => x.ApiKeyEncrypted).HasMaxLength(4000);
+        });
+
+        b.Entity<AiModel>(e =>
+        {
+            e.Property(x => x.ModelId).HasMaxLength(200);
+            e.Property(x => x.DisplayName).HasMaxLength(100);
+            e.Property(x => x.ResponseFormat).HasConversion<string>().HasMaxLength(16);
+            e.HasOne(x => x.Provider).WithMany(p => p.Models).HasForeignKey(x => x.AiProviderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.AiProviderId, x.ModelId }).IsUnique();
+            e.HasIndex(x => x.IsDefault).IsUnique().HasFilter("\"IsDefault\" = true");
         });
     }
 }

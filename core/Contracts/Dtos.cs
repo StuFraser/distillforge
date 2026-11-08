@@ -72,4 +72,5 @@ public sealed record ExtractionRunDto(
     DateTimeOffset? CompletedAt,
     ExtractionPhase? Phase = null,
     int? WindowIndex = null,
-    int? WindowCount = null);
+    int? WindowCount = null,
+    Guid? AiModelId = null);

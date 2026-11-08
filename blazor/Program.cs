@@ -14,5 +14,6 @@ if (!apiBase.EndsWith('/')) apiBase += "/";
 
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiBase) });
 builder.Services.AddScoped<DistillForgeApi>();
+builder.Services.AddScoped<AiSettingsState>();
 
 await builder.Build().RunAsync();

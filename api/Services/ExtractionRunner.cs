@@ -11,7 +11,8 @@ namespace DistillForge.Api.Services;
 /// Pipeline: plan windows → per window: extract → validate (segment IDs, quotes) → resolve offsets →
 /// merge duplicates from overlapping windows (pass 1), then an LLM consolidation pass (pass 2) → persist. Documents that fit the budget are one window.
 /// </summary>
-public sealed class ExtractionRunner(DistillForgeDbContext db, IActionExtractor extractor, ILogger<ExtractionRunner> logger)
+public sealed class ExtractionRunner(
+    DistillForgeDbContext db, Ai.AiConfigResolver resolver, Ai.ActionExtractorFactory extractors, ILogger<ExtractionRunner> logger)
 {
     public async Task RunAsync(Guid runId, CancellationToken ct)
     {
@@ -38,10 +39,14 @@ public sealed class ExtractionRunner(DistillForgeDbContext db, IActionExtractor 
                 .FirstAsync(w => w.Id == run.WorkspaceId, ct);
             var segments = workspace.ToCoreSegments();
 
+            var config = await resolver.ResolveAsync(run.AiModelId, ct);
+            var extractor = extractors.Create(config);
+            logger.LogInformation("Run {RunId}: using model {Model} at {Url}.", runId, config.Model, config.BaseUrl);
+
             int windowBudget = extractor.PromptBudgetTokens - Ai.ExtractionPrompt.FixedOverhead;
             if (windowBudget <= 0)
                 throw new Ai.ExtractionFailedException(
-                    $"Prompt budget ({extractor.PromptBudgetTokens} tokens) is too small for the extraction prompt; increase AiProvider:ContextTokens.");
+                    $"Prompt budget ({extractor.PromptBudgetTokens} tokens) is too small for the extraction prompt; raise the model's context tokens in AI settings.");
             var windows = WindowPlanner.Plan(segments, windowBudget);
             run.EstimatedPromptTokens = windows.Sum(w => Ai.ExtractionPrompt.EstimateTokens(w.Segments));
             logger.LogInformation("Run {RunId}: {Segments} segments in {Windows} window(s), window budget {Budget} tokens.",

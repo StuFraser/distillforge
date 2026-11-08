@@ -1,20 +1,10 @@
+using DistillForge.Core.Contracts;
+
 namespace DistillForge.Api.Ai;
-
-public enum ResponseFormatMode
-{
-    /// <summary>response_format: json_schema (Ollama, OpenAI, LM Studio).</summary>
-    JsonSchema,
-
-    /// <summary>response_format: json_object, for backends without schema support.</summary>
-    JsonObject,
-
-    /// <summary>No response_format; rely on the prompt plus validate-and-retry.</summary>
-    None,
-}
 
 /// <summary>
 /// Any OpenAI-compatible chat-completions endpoint (Ollama, LM Studio, OpenAI, Azure, OpenRouter...).
-/// Bound from the "AiProvider" config section. Per-user provider config comes later.
+/// Bound from the "AiProvider" config section. Used as a fallback when no model is configured in the database (see AiConfigResolver).
 /// </summary>
 public sealed class AiProviderOptions
 {

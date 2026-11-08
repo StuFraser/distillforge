@@ -2,10 +2,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using DistillForge.Core.Contracts;
 using DistillForge.Core.Extraction;
 using DistillForge.Core.Segmentation;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace DistillForge.Api.Ai;
 
@@ -18,10 +18,10 @@ public sealed class ExtractionFailedException(string message, Exception? inner =
 /// </summary>
 public sealed class OpenAiCompatibleActionExtractor(
     HttpClient http,
-    IOptions<AiProviderOptions> options,
+    AiProviderOptions options,
     ILogger<OpenAiCompatibleActionExtractor> logger) : IActionExtractor
 {
-    private readonly AiProviderOptions _opt = options.Value;
+    private readonly AiProviderOptions _opt = options;
 
     public int PromptBudgetTokens => _opt.PromptBudget;
 
@@ -29,15 +29,15 @@ public sealed class OpenAiCompatibleActionExtractor(
     {
         var segments = window.Segments;
         if (string.IsNullOrWhiteSpace(_opt.BaseUrl) || string.IsNullOrWhiteSpace(_opt.Model))
-            throw new ExtractionFailedException("AiProvider:BaseUrl and AiProvider:Model must be configured.");
+            throw new ExtractionFailedException("The AI provider has no base URL or model configured.");
 
         int estimate = ExtractionPrompt.EstimateTokens(segments);
         if (estimate > _opt.PromptBudget)
         {
             throw new ExtractionFailedException(
                 $"Window is ~{estimate} tokens but the prompt budget is {_opt.PromptBudget} " +
-                $"(ContextTokens {_opt.ContextTokens} - ReserveOutput {_opt.ReserveOutput}, less {_opt.SafetyMargin:P0}). " +
-                "A single segment is larger than the budget; increase AiProvider:ContextTokens.");
+                $"(context {_opt.ContextTokens} - reserved output {_opt.ReserveOutput}, less {_opt.SafetyMargin:P0}). " +
+                "A single segment is larger than the budget; raise the model's context tokens in AI settings.");
         }
 
         var messages = new JsonArray
@@ -57,7 +57,7 @@ public sealed class OpenAiCompatibleActionExtractor(
     public async Task<ConsolidationResult> ConsolidateAsync(IReadOnlyList<ConsolidationCandidate> candidates, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_opt.BaseUrl) || string.IsNullOrWhiteSpace(_opt.Model))
-            throw new ExtractionFailedException("AiProvider:BaseUrl and AiProvider:Model must be configured.");
+            throw new ExtractionFailedException("The AI provider has no base URL or model configured.");
 
         var messages = new JsonArray
         {
@@ -178,7 +178,7 @@ public sealed class OpenAiCompatibleActionExtractor(
         {
             throw new ExtractionFailedException(
                 $"Response was truncated (finish_reason=length, completion {usage?.CompletionTokens} tokens). " +
-                "Increase AiProvider:ReserveOutput or use a smaller document.");
+                "Increase the model's reserved output in AI settings or use a smaller document.");
         }
 
         return new Completion(content, model, finish, usage);

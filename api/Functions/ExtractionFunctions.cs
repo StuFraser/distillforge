@@ -33,6 +33,17 @@ public sealed class ExtractionFunctions(DistillForgeDbContext db, ExtractionRunn
         if (!await db.Workspaces.AnyAsync(w => w.Id == id && !w.IsArchived, ct))
             return new StartExtractionOutput { Result = new NotFoundResult() };
 
+        // Optional body { aiModelId }. No body (or null id) = the workspace's last model, else the default.
+        var request = await WorkspaceFunctions.ReadBody<StartExtractionRequest>(req, ct);
+        var modelId = request?.AiModelId;
+        if (modelId is Guid requested && !await db.AiModels.AnyAsync(m => m.Id == requested, ct))
+            return new StartExtractionOutput { Result = new BadRequestObjectResult("That AI model no longer exists.") };
+        modelId ??= await db.ExtractionRuns.AsNoTracking()
+            .Where(r => r.WorkspaceId == id && r.AiModelId != null)
+            .OrderByDescending(r => r.CreatedAt)
+            .Select(r => r.AiModelId)
+            .FirstOrDefaultAsync(ct);
+
         var active = await db.ExtractionRuns.AsNoTracking()
             .Where(r => r.WorkspaceId == id && (r.Status == ExtractionRunStatus.Queued || r.Status == ExtractionRunStatus.Running))
             .OrderByDescending(r => r.CreatedAt)
@@ -45,6 +56,7 @@ public sealed class ExtractionFunctions(DistillForgeDbContext db, ExtractionRunn
             Id = Guid.CreateVersion7(),
             WorkspaceId = id,
             Status = ExtractionRunStatus.Queued,
+            AiModelId = modelId,
             CreatedAt = DateTimeOffset.UtcNow,
         };
         db.ExtractionRuns.Add(run);

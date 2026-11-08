@@ -75,6 +75,81 @@ namespace DistillForge.Data.Migrations
                     b.ToTable("ActionItems");
                 });
 
+            modelBuilder.Entity("DistillForge.Data.Entities.AiModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AiProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ContextTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ModelId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("ReserveOutput")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResponseFormat")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDefault")
+                        .IsUnique()
+                        .HasFilter("\"IsDefault\" = true");
+
+                    b.HasIndex("AiProviderId", "ModelId")
+                        .IsUnique();
+
+                    b.ToTable("AiModels");
+                });
+
+            modelBuilder.Entity("DistillForge.Data.Entities.AiProvider", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApiKeyEncrypted")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("BaseUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("TimeoutSeconds")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AiProviders");
+                });
+
             modelBuilder.Entity("DistillForge.Data.Entities.Category", b =>
                 {
                     b.Property<Guid>("Id")
@@ -148,6 +223,9 @@ namespace DistillForge.Data.Migrations
                     b.Property<int?>("ActionItemCount")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("AiModelId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -199,6 +277,8 @@ namespace DistillForge.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AiModelId");
 
                     b.HasIndex("WorkspaceId");
 
@@ -296,6 +376,17 @@ namespace DistillForge.Data.Migrations
                     b.Navigation("Workspace");
                 });
 
+            modelBuilder.Entity("DistillForge.Data.Entities.AiModel", b =>
+                {
+                    b.HasOne("DistillForge.Data.Entities.AiProvider", "Provider")
+                        .WithMany("Models")
+                        .HasForeignKey("AiProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Provider");
+                });
+
             modelBuilder.Entity("DistillForge.Data.Entities.Category", b =>
                 {
                     b.HasOne("DistillForge.Data.Entities.Workspace", "Workspace")
@@ -328,6 +419,11 @@ namespace DistillForge.Data.Migrations
 
             modelBuilder.Entity("DistillForge.Data.Entities.ExtractionRun", b =>
                 {
+                    b.HasOne("DistillForge.Data.Entities.AiModel", null)
+                        .WithMany()
+                        .HasForeignKey("AiModelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("DistillForge.Data.Entities.Workspace", "Workspace")
                         .WithMany("ExtractionRuns")
                         .HasForeignKey("WorkspaceId")
@@ -351,6 +447,11 @@ namespace DistillForge.Data.Migrations
             modelBuilder.Entity("DistillForge.Data.Entities.ActionItem", b =>
                 {
                     b.Navigation("Evidence");
+                });
+
+            modelBuilder.Entity("DistillForge.Data.Entities.AiProvider", b =>
+                {
+                    b.Navigation("Models");
                 });
 
             modelBuilder.Entity("DistillForge.Data.Entities.Workspace", b =>

@@ -127,6 +127,7 @@ public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceServic
     internal static async Task<T?> ReadBody<T>(HttpRequest req, CancellationToken ct) where T : class
     {
         try { return await req.ReadFromJsonAsync<T>(ct); }
-        catch (System.Text.Json.JsonException) { return null; }
+        // InvalidOperationException: no/unknown content type (e.g. a bodyless POST).
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException) { return null; }
     }
 }
