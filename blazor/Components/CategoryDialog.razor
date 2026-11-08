@@ -1,0 +1,59 @@
+<div class="dialog-backdrop" @onclick="BackdropClick">
+    <div class="dialog item-dialog" role="dialog" aria-modal="true" aria-labelledby="cat-title" @onclick:stopPropagation="true">
+        <h2 id="cat-title">@(Existing is null ? "New category" : "Edit category")</h2>
+
+        @if (Error is not null)
+        {
+            <p class="warning error" role="alert">@Error</p>
+        }
+
+        <label for="cat-name">Name</label>
+        <input id="cat-name" type="text" maxlength="@CategoryValidation.MaxName" @bind="_name" @bind:event="oninput"
+               @onkeydown="OnKey" disabled="@Busy" placeholder="e.g. Follow ups" />
+
+        <div>
+            <span class="field-label" id="cat-colour-label">Accent colour</span>
+            <div class="swatches" role="radiogroup" aria-labelledby="cat-colour-label">
+                <button type="button" role="radio" aria-checked="@(_colour is null)" class="swatch-choice none @(_colour is null ? "chosen" : "")"
+                        title="No accent" aria-label="No accent" @onclick="() => _colour = null" disabled="@Busy">∅</button>
+                @foreach (var key in NoteColours.Keys)
+                {
+                    var selected = key == _colour;
+                    <button type="button" role="radio" aria-checked="@selected" class="swatch-choice @(selected ? "chosen" : "")"
+                            style="background: var(--note-@key)" title="@NoteColours.Label(key)"
+                            aria-label="@NoteColours.Label(key)" @onclick="() => _colour = key" disabled="@Busy"></button>
+                }
+            </div>
+        </div>
+
+        <div class="dialog-actions">
+            <button type="button" class="secondary" @onclick="OnCancel" disabled="@Busy">Cancel</button>
+            <button type="button" class="primary" @onclick="Save" disabled="@(!CanSave || Busy)">@(Busy ? "Saving…" : "Save")</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CategoryDto? Existing { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback<CategoryRequest> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string _name = "";
+    private string? _colour;
+
+    protected override void OnInitialized()
+    {
+        _name = Existing?.Name ?? "";
+        _colour = Existing?.Colour;
+    }
+
+    private CategoryRequest Build() => new(_name.Trim(), _colour);
+    private bool CanSave => CategoryValidation.Validate(Build()) is null &&
+        (Existing is null || Build() != new CategoryRequest(Existing.Name, Existing.Colour));
+
+    private Task Save() => CanSave ? OnSave.InvokeAsync(Build()) : Task.CompletedTask;
+    private Task OnKey(KeyboardEventArgs e) => e.Key == "Enter" && !Busy ? Save() : Task.CompletedTask;
+    private Task BackdropClick() => Busy ? Task.CompletedTask : OnCancel.InvokeAsync();
+}

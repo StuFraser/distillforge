@@ -34,6 +34,26 @@ public sealed class DistillForgeApi(HttpClient http)
         await Send<ActionItemDto>(() => http.PutAsJsonAsync($"actions/{id}", request, ct), ct)
         ?? throw new ApiException("That note no longer exists (the workspace may have been re-extracted).");
 
+    public async Task<List<CategoryDto>> GetCategoriesAsync(Guid workspaceId, CancellationToken ct = default) =>
+        await Send<List<CategoryDto>>(() => http.GetAsync($"workspaces/{workspaceId}/categories", ct), ct) ?? [];
+
+    public async Task<CategoryDto> CreateCategoryAsync(Guid workspaceId, CategoryRequest request, CancellationToken ct = default) =>
+        (await Send<CategoryDto>(() => http.PostAsJsonAsync($"workspaces/{workspaceId}/categories", request, ct), ct))!;
+
+    public async Task<CategoryDto> UpdateCategoryAsync(Guid id, CategoryRequest request, CancellationToken ct = default) =>
+        await Send<CategoryDto>(() => http.PutAsJsonAsync($"categories/{id}", request, ct), ct)
+        ?? throw new ApiException("That category no longer exists.");
+
+    public async Task DeleteCategoryAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await http.DeleteAsync($"categories/{id}", ct);
+        if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound) throw await ToException(response, ct);
+    }
+
+    public async Task<ActionItemDto> MoveActionAsync(Guid id, Guid? categoryId, CancellationToken ct = default) =>
+        await Send<ActionItemDto>(() => http.PutAsJsonAsync($"actions/{id}/category", new MoveActionItemRequest(categoryId), ct), ct)
+        ?? throw new ApiException("That note no longer exists (the workspace may have been re-extracted).");
+
     /// <summary>Starts a run (202), or returns the run already in progress (409).</summary>
     public async Task<ExtractionRunDto> StartExtractionAsync(Guid workspaceId, CancellationToken ct = default)
     {

@@ -1,5 +1,5 @@
 @* A wrapper holds two sibling buttons (select + zoom); buttons can't be nested validly. *@
-<div class="note-wrap">
+<div class="note-wrap @(Dragging ? "dragging" : "")" draggable="@(Draggable ? "true" : "false")" @ondragstart="OnDragStart" @ondragend="OnDragEnd">
     <button type="button" class="note @(Selected ? "selected" : "")" style="--note-colour: var(--note-@ColourKey)" @onclick="OnClick" title="@Item.Summary" aria-pressed="@Selected">
         <span class="note-title">@Item.Title</span>
         @if (!string.IsNullOrEmpty(Item.Owner) || !string.IsNullOrEmpty(Item.Due) || LowConfidence)
@@ -19,6 +19,10 @@
     [Parameter] public bool Selected { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
     [Parameter] public EventCallback OnZoom { get; set; }
+    [Parameter] public bool Draggable { get; set; }
+    [Parameter] public bool Dragging { get; set; }
+    [Parameter] public EventCallback OnDragStart { get; set; }
+    [Parameter] public EventCallback OnDragEnd { get; set; }
 
     /// <summary>The chosen colour, or automatic: yellow when the note has a deadline, otherwise pink.</summary>
     private string ColourKey => Item.Colour is { } c && NoteColours.IsValid(c)

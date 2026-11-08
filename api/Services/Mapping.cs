@@ -20,6 +20,8 @@ public static class Mapping
             .ToList(),
         a.Colour);
 
+    public static CategoryDto ToDto(this Category c) => new(c.Id, c.Name, c.Colour, c.SortOrder);
+
     public static ExtractionRunDto ToDto(this ExtractionRun r) => new(
         r.Id, r.WorkspaceId, r.Status, r.Model, r.PromptTokens, r.CompletionTokens, r.ActionItemCount,
         r.Error, r.Warnings, r.CreatedAt, r.CompletedAt, r.Phase, r.WindowIndex, r.WindowCount);

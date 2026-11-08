@@ -77,7 +77,10 @@
     </section>
 
     <div class="right-column">
-        <section class="panel notes-panel" aria-label="Uncategorised action items">
+        <section class="panel notes-panel @(_dropTarget == UncategorisedTarget ? "drop-over" : "")" aria-label="Uncategorised action items"
+                 @ondragover="() => OnDragOverTarget(UncategorisedTarget)" @ondragover:preventDefault="@(_dragId is not null)"
+                 @ondragleave="() => ClearDropTarget(UncategorisedTarget)"
+                 @ondrop="() => DropOn(null)" @ondrop:preventDefault="true">
             <header class="panel-header">
                 <h2>Uncategorised</h2>
                 @if (IsExtracting)
@@ -131,7 +134,8 @@
             <div class="notes-grid">
                 @foreach (var item in VisibleUncategorised)
                 {
-                    <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)" />
+                    <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)"
+                                Draggable="CanEdit" Dragging="_dragId == item.Id" OnDragStart="() => StartDrag(item)" OnDragEnd="EndDrag" />
                 }
                 @if (!IsExtracting && _workspace is not null && _actions.Count == 0)
                 {
@@ -144,11 +148,60 @@
             </div>
         </section>
 
-        <section class="panel categories-panel" aria-label="Categories">
-            <nav class="category-tabs" aria-label="Categories">
-                <span class="tab placeholder">Categories coming soon</span>
+        <section class="panel categories-panel @(_dropTarget == BodyTarget ? "drop-over" : "")" aria-label="Categories">
+            <nav class="category-tabs" aria-label="Categories" role="tablist">
+                @foreach (var c in _categories)
+                {
+                    var active = c.Id == ActiveCategory?.Id;
+                    <button type="button" role="tab" aria-selected="@active"
+                            class="tab @(active ? "active" : "") @(_dropTarget == c.Id.ToString() ? "drop-over" : "")"
+                            style="--tab-accent: @AccentVar(c)"
+                            @onclick="() => _activeCategoryId = c.Id"
+                            @ondblclick="() => OpenCategoryEdit(c)"
+                            @ondragover="() => OnDragOverTarget(c.Id.ToString())" @ondragover:preventDefault="@(_dragId is not null)"
+                            @ondragenter="() => OnDragOverTarget(c.Id.ToString())"
+                            @ondragleave="() => ClearDropTarget(c.Id.ToString())"
+                            @ondrop="() => DropOn(c.Id)" @ondrop:preventDefault="true"
+                            title="Double-click to edit">
+                        @c.Name <span class="tab-count">@CountIn(c)</span>
+                    </button>
+                }
+                @if (_categories.Count == 0)
+                {
+                    <span class="tab placeholder">No categories yet</span>
+                }
+                <span class="tab-spacer"></span>
+                @if (CanEdit)
+                {
+                    <button type="button" class="icon-button" title="Add category" aria-label="Add category" @onclick="OpenCategoryNew">＋</button>
+                    @if (ActiveCategory is not null)
+                    {
+                        <button type="button" class="icon-button" title="Edit category" aria-label="Edit category" @onclick="() => OpenCategoryEdit(ActiveCategory)">✎</button>
+                        <button type="button" class="icon-button danger" title="Delete category" aria-label="Delete category" @onclick="() => DeleteCategory(ActiveCategory)">✕</button>
+                    }
+                }
             </nav>
-            <div class="notes-grid"></div>
+            <div class="notes-grid category-body"
+                 @ondragover="() => OnDragOverTarget(BodyTarget)" @ondragover:preventDefault="@(_dragId is not null && ActiveCategory is not null)"
+                 @ondragleave="() => ClearDropTarget(BodyTarget)"
+                 @ondrop="() => DropOn(ActiveCategory?.Id)" @ondrop:preventDefault="true">
+                @if (ActiveCategory is null)
+                {
+                    <p class="muted empty-hint">@(_workspace is null ? "Open a workspace to add categories." : "Add a category with ＋, then drag notes onto it.")</p>
+                }
+                else
+                {
+                    @foreach (var item in InActive)
+                    {
+                        <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)"
+                                    Draggable="CanEdit" Dragging="_dragId == item.Id" OnDragStart="() => StartDrag(item)" OnDragEnd="EndDrag" />
+                    }
+                    @if (InActive.Count == 0)
+                    {
+                        <p class="muted empty-hint">Drag notes here to put them in “@ActiveCategory.Name”.</p>
+                    }
+                }
+            </div>
         </section>
     </div>
 </div>
@@ -162,6 +215,11 @@
 {
     <ActionItemDialog Item="_editing" ReadOnly="_workspace?.IsArchived == true" Busy="_editSaving" Error="@_editError"
                       OnSave="SaveItem" OnCancel="CloseItem" />
+}
+
+@if (_categoryDialog)
+{
+    <CategoryDialog Existing="_categoryEditing" Busy="_categorySaving" Error="@_categoryError" OnSave="SaveCategory" OnCancel="() => _categoryDialog = false" />
 }
 
 @if (_showDialog)
@@ -182,6 +240,105 @@
     private readonly CancellationTokenSource _cts = new();
 
     private bool _progressHidden;
+
+    // ---- Categories ----
+    private List<CategoryDto> _categories = [];
+    private Guid? _activeCategoryId;
+    private bool _categoryDialog, _categorySaving;
+    private CategoryDto? _categoryEditing;
+    private string? _categoryError;
+
+    private bool CanEdit => _workspace is { IsArchived: false } && !IsExtracting;
+
+    private CategoryDto? ActiveCategory => _categories.FirstOrDefault(c => c.Id == _activeCategoryId) ?? _categories.FirstOrDefault();
+    private List<ActionItemDto> InActive => ActiveCategory is { } c ? _actions.Where(a => a.CategoryId == c.Id).ToList() : [];
+    private int CountIn(CategoryDto c) => _actions.Count(a => a.CategoryId == c.Id);
+    private static string AccentVar(CategoryDto c) => c.Colour is null ? "var(--border-strong)" : $"var(--note-{c.Colour})";
+
+    private void OpenCategoryNew() { _categoryEditing = null; _categoryError = null; _categoryDialog = true; }
+    private void OpenCategoryEdit(CategoryDto c) { if (!CanEdit) return; _categoryEditing = c; _categoryError = null; _categoryDialog = true; }
+
+    private async Task SaveCategory(CategoryRequest request)
+    {
+        if (_workspace is null) return;
+        _categorySaving = true;
+        _categoryError = null;
+        try
+        {
+            if (_categoryEditing is null)
+            {
+                var created = await Api.CreateCategoryAsync(_workspace.Id, request, _cts.Token);
+                _categories.Add(created);
+                _activeCategoryId = created.Id;
+            }
+            else
+            {
+                var saved = await Api.UpdateCategoryAsync(_categoryEditing.Id, request, _cts.Token);
+                var i = _categories.FindIndex(c => c.Id == saved.Id);
+                if (i >= 0) _categories[i] = saved;
+            }
+            _categoryDialog = false;
+        }
+        catch (ApiException ex) { _categoryError = ex.Message; }
+        finally { _categorySaving = false; }
+    }
+
+    private async Task DeleteCategory(CategoryDto c)
+    {
+        var n = CountIn(c);
+        var msg = n == 0 ? $"Delete category “{c.Name}”?" : $"Delete category “{c.Name}”? Its {n} note{(n == 1 ? "" : "s")} will return to Uncategorised.";
+        if (!await JS.InvokeAsync<bool>("confirm", msg)) return;
+        try
+        {
+            await Api.DeleteCategoryAsync(c.Id, _cts.Token);
+            _categories.Remove(c);
+            for (var i = 0; i < _actions.Count; i++)
+                if (_actions[i].CategoryId == c.Id) _actions[i] = _actions[i] with { CategoryId = null };
+            if (_activeCategoryId == c.Id) _activeCategoryId = null;
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
+    // ---- Drag and drop ----
+    private const string UncategorisedTarget = "uncategorised";
+    private const string BodyTarget = "body";
+    private Guid? _dragId;
+    private string? _dropTarget;
+
+    private void StartDrag(ActionItemDto item) { if (CanEdit) _dragId = item.Id; }
+
+    private void EndDrag() { _dragId = null; _dropTarget = null; }
+
+    private void OnDragOverTarget(string target) { if (_dragId is not null) _dropTarget = target; }
+
+    private void ClearDropTarget(string target) { if (_dropTarget == target) _dropTarget = null; }
+
+    /// <summary>Moves the dragged note to a category (or Uncategorised when null). Optimistic; reverts on failure.</summary>
+    private async Task DropOn(Guid? categoryId)
+    {
+        var id = _dragId;
+        EndDrag();
+        if (id is null || !CanEdit) return;
+        var i = _actions.FindIndex(a => a.Id == id);
+        if (i < 0 || _actions[i].CategoryId == categoryId) return;
+
+        var before = _actions[i];
+        _actions[i] = before with { CategoryId = categoryId };
+        if (categoryId is not null) _activeCategoryId = categoryId;
+        try
+        {
+            var saved = await Api.MoveActionAsync(before.Id, categoryId, _cts.Token);
+            var j = _actions.FindIndex(a => a.Id == saved.Id);
+            if (j >= 0) _actions[j] = saved;
+        }
+        catch (ApiException ex)
+        {
+            var j = _actions.FindIndex(a => a.Id == before.Id);
+            if (j >= 0) _actions[j] = before;
+            _error = ex.Message;
+        }
+        catch (OperationCanceledException) { }
+    }
 
     private ActionItemDto? _editing;
     private bool _editSaving;
@@ -283,6 +440,8 @@
         _workspace = await Api.GetWorkspaceAsync(id, _cts.Token);
         _actions = _workspace is null ? [] : await Api.GetActionsAsync(id, _cts.Token);
         _run = _workspace is null ? null : await Api.GetLatestRunAsync(id, _cts.Token);
+        _categories = _workspace is null ? [] : await Api.GetCategoriesAsync(id, _cts.Token);
+        _activeCategoryId = null;
         ResetFilters();
         ClearSelection();
         // A run left in flight (e.g. page refreshed mid-extraction) is picked up again.
@@ -338,6 +497,7 @@
     {
         _workspace = null;
         _actions = [];
+        _categories = [];
         _run = null;
         ClearSelection();
     }
@@ -355,6 +515,7 @@
                 ? await Api.CreateWorkspaceAsync(new CreateWorkspaceRequest(input.Text, null, input.Strategy), _cts.Token)
                 : await Api.ReplaceSourceAsync(_workspace.Id, new ReplaceSourceRequest(input.Text, input.Strategy), _cts.Token);
             _actions = [];
+            _categories = _workspace is null ? [] : await Api.GetCategoriesAsync(_workspace.Id, _cts.Token);
             _run = null;
             ClearSelection();
             _showDialog = false;

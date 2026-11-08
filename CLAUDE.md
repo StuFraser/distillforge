@@ -15,13 +15,6 @@ Key feature is that extracted notes can be linked back to relevant passages in s
   (Ollama in dev). Plain chat completions + `response_format` only; no
   backend-specific code paths.
 
-## Folder Structure
-- `api/` – Azure Functions app
-- `blazor/` – Blazor WebAssembly front end
-- `core/` – Shared types (DTOs, enums, validation) used by api and blazor
-- `data/` – EF Core DbContext, entities, migrations (referenced by api only)
-- `tests/` – xUnit tests (currently `DistillForge.Core.Tests`)
-
 ## Architecture Rules
 - `core` must stay dependency-light: no EF Core, Npgsql, Azure SDKs or
   anything that won't run in the browser.
@@ -52,14 +45,12 @@ Key feature is that extracted notes can be linked back to relevant passages in s
 - Local machine-specific details: @~/.claude/distillforge-local.md
 
 ## Commands
-- Build all: `dotnet build`
 - Restore tools (dotnet-ef): `dotnet tool restore`
 - Queue storage for the API: `npx azurite` (or `docker compose up azurite`)
 - Apply migrations: `dotnet ef database update --project data/DistillForge.Data.csproj --startup-project api/DistillForge.Api.csproj`
   (reads `ConnectionStrings__Postgres` from `api/local.settings.json`; an env var of the same name overrides it)
 - Run API: `cd api && func start`
 - Run front end: `cd blazor && dotnet watch`
-- Tests: `dotnet test`
 - New migration: `dotnet ef migrations add <Name> --project data/DistillForge.Data.csproj --startup-project api/DistillForge.Api.csproj`
 
 ## Deployment (planned)
