@@ -87,8 +87,8 @@
     </section>
 
     <div class="right-column">
-        <section class="panel notes-panel @(_dropTarget == UncategorisedTarget ? "drop-over" : "")" aria-label="Uncategorised action items"
-                 @ondragover="() => OnDragOverTarget(UncategorisedTarget)" @ondragover:preventDefault="@(_dragId is not null)"
+        <section class="panel notes-panel @(_drag.DropTarget == UncategorisedTarget ? "drop-over" : "")" aria-label="Uncategorised action items"
+                 @ondragover="() => OnDragOverTarget(UncategorisedTarget)" @ondragover:preventDefault="@(_drag.IsDragging)"
                  @ondragleave="() => ClearDropTarget(UncategorisedTarget)"
                  @ondrop="() => DropOn(null)" @ondrop:preventDefault="true">
             <header class="panel-header">
@@ -152,8 +152,8 @@
                     <span class="muted filter-count">Showing @VisibleUncategorised.Count of @_actions.Count(a => a.CategoryId is null)</span>
                 </div>
             }
-            <NoteGrid Notes="VisibleUncategorised" CanEdit="CanEdit" SelectedId="_selectedId" DragId="_dragId" MergeHoverId="_mergeHover"
-                      MergedCountOf="MergedCountOf" CanDropOn="CanDropOn"
+            <NoteGrid Notes="VisibleUncategorised" CanEdit="CanEdit" SelectedId="_selectedId" Drag="_drag"
+                      MergedCountOf="MergedCountOf"
                       OnSelect="Select" OnOpen="OpenItem" OnNoteMenu="m => ShowNoteMenu(m.Item, m.Args)" OnPaneMenu="e => ShowPaneMenu(null, e)"
                       OnDragStart="StartDrag" OnDragEnd="EndDrag" OnDragEnterNote="NoteDragEnter" OnDragLeaveNote="NoteDragLeave" OnDropNote="DropOnNote">
                 @if (!IsExtracting && _workspace is not null && _actions.Count == 0)
@@ -167,17 +167,17 @@
             </NoteGrid>
         </section>
 
-        <section class="panel categories-panel @(_dropTarget == BodyTarget ? "drop-over" : "")" aria-label="Categories">
+        <section class="panel categories-panel @(_drag.DropTarget == BodyTarget ? "drop-over" : "")" aria-label="Categories">
             <nav class="category-tabs" aria-label="Categories" role="tablist">
                 @foreach (var c in _categories)
                 {
                     var active = c.Id == ActiveCategory?.Id;
                     <button type="button" role="tab" aria-selected="@active"
-                            class="tab @(active ? "active" : "") @(_dropTarget == c.Id.ToString() ? "drop-over" : "")"
+                            class="tab @(active ? "active" : "") @(_drag.DropTarget == c.Id.ToString() ? "drop-over" : "")"
                             style="--tab-accent: @AccentVar(c)"
                             @onclick="() => _activeCategoryId = c.Id"
                             @ondblclick="() => OpenCategoryEdit(c)"
-                            @ondragover="() => OnDragOverTarget(c.Id.ToString())" @ondragover:preventDefault="@(_dragId is not null)"
+                            @ondragover="() => OnDragOverTarget(c.Id.ToString())" @ondragover:preventDefault="@(_drag.IsDragging)"
                             @ondragenter="() => OnDragOverTarget(c.Id.ToString())"
                             @ondragleave="() => ClearDropTarget(c.Id.ToString())"
                             @ondrop="() => DropOn(c.Id)" @ondrop:preventDefault="true"
@@ -200,11 +200,11 @@
                     }
                 }
             </nav>
-            <NoteGrid Notes="InActive" CssClass="category-body" CanEdit="CanEdit" SelectedId="_selectedId" DragId="_dragId" MergeHoverId="_mergeHover"
-                      MergedCountOf="MergedCountOf" CanDropOn="CanDropOn"
+            <NoteGrid Notes="InActive" CssClass="category-body" CanEdit="CanEdit" SelectedId="_selectedId" Drag="_drag"
+                      MergedCountOf="MergedCountOf"
                       OnSelect="Select" OnOpen="OpenItem" OnNoteMenu="m => ShowNoteMenu(m.Item, m.Args)" OnPaneMenu="e => ShowPaneMenu(ActiveCategory?.Id, e)"
                       OnDragStart="StartDrag" OnDragEnd="EndDrag" OnDragEnterNote="NoteDragEnter" OnDragLeaveNote="NoteDragLeave" OnDropNote="DropOnNote"
-                      OnDragOverGrid="() => OnDragOverTarget(BodyTarget)" PreventDragOverDefault="@(_dragId is not null && ActiveCategory is not null)"
+                      OnDragOverGrid="() => OnDragOverTarget(BodyTarget)" PreventDragOverDefault="@(_drag.IsDragging && ActiveCategory is not null)"
                       OnDragLeaveGrid="() => ClearDropTarget(BodyTarget)"
                       OnDropOnGrid="() => DropOn(ActiveCategory?.Id)" PreventDropDefault="true">
                 @if (ActiveCategory is null)
@@ -366,28 +366,23 @@
     }
 
     // ---- Drag and drop ----
-    private const string UncategorisedTarget = "uncategorised";
-    private const string BodyTarget = "body";
-    private Guid? _dragId;
-    private string? _dropTarget;
+    private const string UncategorisedTarget = NoteDragState.UncategorisedTarget;
+    private const string BodyTarget = NoteDragState.BodyTarget;
+    private readonly NoteDragState _drag = new();
 
-    private void StartDrag(ActionItemDto item) { if (CanEdit) _dragId = item.Id; }
+    private void StartDrag(ActionItemDto item) { if (CanEdit) _drag.Begin(item.Id); }
 
-    private void EndDrag() { _dragId = null; _dropTarget = null; _mergeHover = null; }
+    private void EndDrag() => _drag.End();
 
     // ---- Merging (drop a note onto another) ----
-    private Guid? _mergeHover;
 
-    private bool CanDropOn(ActionItemDto target) => CanEdit && _dragId is Guid d && d != target.Id;
+    private void NoteDragEnter(ActionItemDto target) { if (CanEdit && _drag.CanMergeInto(target.Id)) _drag.HoverNote(target.Id); }
 
-    private void NoteDragEnter(ActionItemDto target) { if (CanDropOn(target)) _mergeHover = target.Id; }
-
-    private void NoteDragLeave(ActionItemDto target) { if (_mergeHover == target.Id) _mergeHover = null; }
+    private void NoteDragLeave(ActionItemDto target) => _drag.LeaveNote(target.Id);
 
     private async Task DropOnNote(ActionItemDto target)
     {
-        var id = _dragId;
-        EndDrag(); // the dragged card may vanish after the merge, in which case dragend never fires
+        var id = _drag.End(); // the dragged card may vanish after the merge, in which case dragend never fires
         if (id is null || id == target.Id || !CanEdit) return;
         var source = _actions.FirstOrDefault(a => a.Id == id);
         if (source is null) return;
@@ -420,15 +415,14 @@
         finally { _editSaving = false; }
     }
 
-    private void OnDragOverTarget(string target) { if (_dragId is not null) _dropTarget = target; }
+    private void OnDragOverTarget(string target) => _drag.Over(target);
 
-    private void ClearDropTarget(string target) { if (_dropTarget == target) _dropTarget = null; }
+    private void ClearDropTarget(string target) => _drag.Leave(target);
 
     /// <summary>Moves the dragged note to a category (or Uncategorised when null). Optimistic; reverts on failure.</summary>
     private async Task DropOn(Guid? categoryId)
     {
-        var id = _dragId;
-        EndDrag();
+        var id = _drag.End();
         if (id is null || !CanEdit) return;
         var i = _actions.FindIndex(a => a.Id == id);
         if (i < 0 || _actions[i].CategoryId == categoryId) return;

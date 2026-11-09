@@ -10,9 +10,9 @@
     {
         <StickyNote Item="item" Selected="item.Id == SelectedId" OnClick="() => OnSelect.InvokeAsync(item)" OnZoom="() => OnOpen.InvokeAsync(item)"
                     OnContextMenu="e => OnNoteMenu.InvokeAsync((item, e))"
-                    Draggable="CanEdit" Dragging="DragId == item.Id" OnDragStart="() => OnDragStart.InvokeAsync(item)" OnDragEnd="OnDragEnd"
+                    Draggable="CanEdit" Dragging="Drag?.DragId == item.Id" OnDragStart="() => OnDragStart.InvokeAsync(item)" OnDragEnd="OnDragEnd"
                     PossibleDuplicate="item.PossibleDuplicateIds is { Count: > 0 }" MergedCount="MergedCountOf(item)"
-                    Droppable="CanDropOn(item)" MergeTarget="MergeHoverId == item.Id"
+                    Droppable="CanEdit && Drag is { } d && d.CanMergeInto(item.Id)" MergeTarget="Drag?.MergeHoverId == item.Id"
                     OnDragEnterNote="() => OnDragEnterNote.InvokeAsync(item)" OnDragLeaveNote="() => OnDragLeaveNote.InvokeAsync(item)"
                     OnDropNote="() => OnDropNote.InvokeAsync(item)" />
     }
@@ -26,13 +26,11 @@
     /// <summary>Notes can be dragged, and right-click opens the "add" menu. False when the workspace is archived or extracting.</summary>
     [Parameter] public bool CanEdit { get; set; }
     [Parameter] public Guid? SelectedId { get; set; }
-    [Parameter] public Guid? DragId { get; set; }
-    [Parameter] public Guid? MergeHoverId { get; set; }
+    /// <summary>The page's shared drag state: shows which note is being dragged and which is the merge target.</summary>
+    [Parameter] public NoteDragState? Drag { get; set; }
 
     /// <summary>How many notes are merged into the given one (shown as a chip).</summary>
     [Parameter] public Func<ActionItemDto, int> MergedCountOf { get; set; } = _ => 0;
-    /// <summary>Whether the dragged note can be dropped onto this note (to merge).</summary>
-    [Parameter] public Func<ActionItemDto, bool> CanDropOn { get; set; } = _ => false;
 
     [Parameter] public EventCallback<ActionItemDto> OnSelect { get; set; }
     [Parameter] public EventCallback<ActionItemDto> OnOpen { get; set; }
