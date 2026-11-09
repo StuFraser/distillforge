@@ -87,6 +87,14 @@ public sealed class DistillForgeApi(HttpClient http)
         if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound) throw await ToException(response, ct);
     }
 
+    public async Task<ActionItemDto> CreateActionAsync(Guid workspaceId, CreateActionItemRequest request, CancellationToken ct = default) =>
+        await Send<ActionItemDto>(() => http.PostAsJsonAsync($"workspaces/{workspaceId}/actions", request, ct), ct)
+        ?? throw new ApiException("That workspace no longer exists.");
+
+    public async Task<List<ActionItemDto>> DeleteActionAsync(Guid id, CancellationToken ct = default) =>
+        await Send<List<ActionItemDto>>(() => http.DeleteAsync($"actions/{id}", ct), ct)
+        ?? throw new ApiException("That note no longer exists.");
+
     // Each of these returns the workspace's full note list (merged notes included).
     public async Task<List<ActionItemDto>> MergeActionAsync(Guid id, Guid targetId, CancellationToken ct = default) =>
         await Send<List<ActionItemDto>>(() => http.PostAsJsonAsync($"actions/{id}/merge", new MergeActionItemRequest(targetId), ct), ct)

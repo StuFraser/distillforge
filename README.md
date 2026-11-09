@@ -13,8 +13,8 @@ business analysts, project consultants and anyone else with long documents full 
 things that need doing.
 
 > **Status:** early development, run locally. You can paste a document, extract notes with
-> your own AI model, edit them, sort them into categories by drag and drop, and merge
-> duplicates. Manual notes, file upload, sign-in and export are still to come (see
+> your own AI model, add, edit and delete notes, sort them into categories by drag and
+> drop, and merge duplicates. File upload, sign-in and export are still to come (see
 > [Roadmap](#roadmap)). The API has no authentication yet, so don't expose it beyond a
 > trusted network.
 
@@ -25,6 +25,10 @@ things that need doing.
 - **Trace** every note to its source: click a note and its evidence is highlighted.
 - **Edit** notes (title, summary, owner, due date, colour) and filter by party, deadline
   and possible duplicates.
+- **Add and delete** notes. Right-click a note for Edit / Delete (delete asks first).
+  Add your own note by right-clicking empty space in a notes panel, or by selecting a
+  passage in the source and clicking "New note from selection", which attaches the passage
+  as the note's evidence. Manual notes survive re-extraction.
 - **Categorise** notes: add, rename, recolour and delete categories per workspace, and drag
   notes between Uncategorised and the categories.
 - **Merge duplicates.** Likely repeats are merged automatically; notes that *might* be the
@@ -197,7 +201,7 @@ Everything is under `/api`.
 |------|--------|
 | Workspaces | `GET/POST workspaces`, `GET workspaces/{id}`, `PUT workspaces/{id}/source` (**wipes** notes, categories and runs), `POST workspaces/{id}/archive`, `POST workspaces/{id}/unarchive` |
 | Extraction | `POST workspaces/{id}/extract` (`202`, or `409` if one is running; optional `{ aiModelId }`), `GET workspaces/{id}/runs`, `GET runs/{id}`, `POST runs/{id}/cancel` |
-| Notes | `GET workspaces/{id}/actions` (includes merged notes), `PUT actions/{id}`, `PUT actions/{id}/category` |
+| Notes | `GET workspaces/{id}/actions` (includes merged notes), `POST workspaces/{id}/actions` (manual note; optional `sourceStart`/`sourceEnd` become its evidence), `PUT actions/{id}`, `DELETE actions/{id}` (returns the full note list; notes merged into it are freed), `PUT actions/{id}/category` |
 | Merging | `POST actions/{id}/merge` `{ targetId }`, `POST actions/{id}/unmerge`, `POST actions/{id}/not-duplicate` `{ otherId }` |
 | Categories | `GET/POST workspaces/{id}/categories`, `PUT/DELETE categories/{id}` |
 | AI providers | `GET/POST ai/providers`, `PUT/DELETE ai/providers/{id}`, `POST ai/providers/{id}/models`, `PUT/DELETE ai/models/{id}`, `GET ai/models`, `POST ai/discover` (lists an endpoint's models; also "test connection") |
@@ -220,8 +224,8 @@ when tuning prompts and checking how faithfully quotes are copied.
    code plus a model consolidation pass, cancel and timeout handling. Still to do: fuzzy
    quote matching, a model comparison harness
 3. **Categories** ✅ (add/rename/delete, drag and drop), **bring-your-own AI settings** ✅,
-   **duplicate flags and merging** ✅, in-app **Help** ✅. Still to do: manual notes and
-   deleting notes
+   **duplicate flags and merging** ✅, in-app **Help** ✅, **manual notes** ✅,
+   **deleting notes** ✅
 4. File upload: txt, md, PDF (text only, no OCR), docx
 5. Entra ID sign-in (API security), per-user data and AI provider settings
 6. Export per category: GitHub Issues first, then DevOps, Jira, email and others

@@ -4,6 +4,7 @@
      @ondragenter="OnDragEnterNote" @ondragenter:stopPropagation="true"
      @ondragover:preventDefault="Droppable" @ondragover:stopPropagation="Droppable"
      @ondragleave="OnDragLeaveNote"
+     @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="ContextMenuEnabled" @oncontextmenu:stopPropagation="ContextMenuEnabled"
      @ondrop="OnDropNote" @ondrop:preventDefault="Droppable" @ondrop:stopPropagation="Droppable">
     <button type="button" class="note @(Selected ? "selected" : "")" style="--note-colour: var(--note-@ColourKey)" @onclick="OnClick" title="@Item.Summary" aria-pressed="@Selected">
         <span class="note-title">
@@ -28,6 +29,8 @@
     [Parameter] public bool Selected { get; set; }
     [Parameter] public EventCallback OnClick { get; set; }
     [Parameter] public EventCallback OnZoom { get; set; }
+    /// <summary>Right-click (or the context-menu key) raised with the pointer position; when the callback isn't bound the browser menu is left alone.</summary>
+    [Parameter] public EventCallback<MouseEventArgs> OnContextMenu { get; set; }
     [Parameter] public bool Draggable { get; set; }
     [Parameter] public bool Dragging { get; set; }
     [Parameter] public EventCallback OnDragStart { get; set; }
@@ -40,6 +43,10 @@
     [Parameter] public EventCallback OnDragEnterNote { get; set; }
     [Parameter] public EventCallback OnDragLeaveNote { get; set; }
     [Parameter] public EventCallback OnDropNote { get; set; }
+
+    private bool ContextMenuEnabled => OnContextMenu.HasDelegate;
+
+    private Task OnContextMenuAsync(MouseEventArgs e) => OnContextMenu.InvokeAsync(e);
 
     /// <summary>The chosen colour, or automatic: yellow when the note has a deadline, otherwise pink.</summary>
     private string ColourKey => Item.Colour is { } c && NoteColours.IsValid(c)

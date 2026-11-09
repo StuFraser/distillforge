@@ -58,7 +58,7 @@
         }
         else
         {
-            <SourcePane Text="@_workspace.SourceText" Highlights="_highlights" />
+            <SourcePane Text="@_workspace.SourceText" Highlights="_highlights" AllowCreate="CanEdit" OnCreateFromSelection="NewFromSelection" />
         }
 
         <footer class="panel-footer">
@@ -152,10 +152,10 @@
                     <span class="muted filter-count">Showing @VisibleUncategorised.Count of @_actions.Count(a => a.CategoryId is null)</span>
                 </div>
             }
-            <div class="notes-grid">
+            <div class="notes-grid" @oncontextmenu="e => ShowPaneMenu(null, e)" @oncontextmenu:preventDefault="CanEdit">
                 @foreach (var item in VisibleUncategorised)
                 {
-                    <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)"
+                    <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)" OnContextMenu="e => ShowNoteMenu(item, e)"
                                 Draggable="CanEdit" Dragging="_dragId == item.Id" OnDragStart="() => StartDrag(item)" OnDragEnd="EndDrag"
                                 PossibleDuplicate="IsPossibleDup(item)" MergedCount="MergedCountOf(item)"
                                 Droppable="CanDropOn(item)" MergeTarget="_mergeHover == item.Id"
@@ -205,7 +205,7 @@
                     }
                 }
             </nav>
-            <div class="notes-grid category-body"
+            <div class="notes-grid category-body" @oncontextmenu="e => ShowPaneMenu(ActiveCategory?.Id, e)" @oncontextmenu:preventDefault="CanEdit"
                  @ondragover="() => OnDragOverTarget(BodyTarget)" @ondragover:preventDefault="@(_dragId is not null && ActiveCategory is not null)"
                  @ondragleave="() => ClearDropTarget(BodyTarget)"
                  @ondrop="() => DropOn(ActiveCategory?.Id)" @ondrop:preventDefault="true">
@@ -217,7 +217,7 @@
                 {
                     @foreach (var item in InActive)
                     {
-                        <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)"
+                        <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)" OnContextMenu="e => ShowNoteMenu(item, e)"
                                     Draggable="CanEdit" Dragging="_dragId == item.Id" OnDragStart="() => StartDrag(item)" OnDragEnd="EndDrag"
                                     PossibleDuplicate="IsPossibleDup(item)" MergedCount="MergedCountOf(item)"
                                     Droppable="CanDropOn(item)" MergeTarget="_mergeHover == item.Id"
@@ -236,6 +236,29 @@
 @if (IsExtracting && !_progressHidden && _run is not null)
 {
     <ExtractionProgressDialog Run="_run" Cancelling="_cancelling" OnHide="() => _progressHidden = true" OnCancel="CancelExtraction" />
+}
+
+@if (_paneMenu)
+{
+    <div class="context-backdrop" @onclick="CloseNoteMenu" @oncontextmenu="CloseNoteMenu" @oncontextmenu:preventDefault="true"></div>
+    <div class="context-menu" role="menu" aria-label="Notes" style="left:@(_menuX)px; top:@(_menuY)px" @onkeydown="OnMenuKeyDown">
+        <button type="button" role="menuitem" @ref="_menuFirst" @onclick="AddFromMenu">Add action item</button>
+    </div>
+}
+
+@if (_menuItem is not null)
+{
+    <div class="context-backdrop" @onclick="CloseNoteMenu" @oncontextmenu="CloseNoteMenu" @oncontextmenu:preventDefault="true"></div>
+    <div class="context-menu" role="menu" aria-label="Note actions" style="left:@(_menuX)px; top:@(_menuY)px" @onkeydown="OnMenuKeyDown">
+        <button type="button" role="menuitem" @ref="_menuFirst" @onclick="EditFromMenu">@(CanEdit ? "Edit" : "View details")</button>
+        <button type="button" role="menuitem" class="danger" disabled="@(!CanEdit)" @onclick="DeleteFromMenu">Delete</button>
+    </div>
+}
+
+@if (_creating)
+{
+    <ActionItemDialog IsNew="true" Item="_newItem" Busy="_editSaving" Error="@_editError" Categories="_categories"
+                      OnSave="SaveNewItem" OnCancel="() => _creating = false" />
 }
 
 @if (_editing is not null)
@@ -448,6 +471,117 @@
     private void OpenItem(ActionItemDto item) { _editError = null; _editing = item; }
 
     private void CloseItem() => _editing = null;
+
+    // Right-click menu on a note: Edit (same dialog as "Open details") and Delete (with confirmation).
+    private ActionItemDto? _menuItem;
+    private bool _paneMenu;               // the empty-space menu (Add action item) is showing
+    private Guid? _menuCategoryId;        // category that menu was opened over (null = Uncategorised)
+    private bool _creating;
+    private Guid? _newCategoryId;
+    private ActionItemDto _newItem = BlankItem([]);
+    private (int Start, int End)? _newSource; // passage the new note is being created from, if any
+    private static ActionItemDto BlankItem(IReadOnlyList<EvidenceDto> evidence) => new(Guid.Empty, "", null, null, null, null, true, 0, evidence);
+    private double _menuX, _menuY;
+    private ElementReference _menuFirst;
+    private bool _focusMenu;
+
+    private void ShowNoteMenu(ActionItemDto item, MouseEventArgs e)
+    {
+        // Keep the menu inside the viewport (approx. menu size 160x84).
+        _menuX = Math.Max(4, e.ClientX);
+        _menuY = Math.Max(4, e.ClientY);
+        _menuItem = item;
+        _focusMenu = true;
+    }
+
+    private void CloseNoteMenu() { _menuItem = null; _paneMenu = false; }
+
+    private void OnMenuKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") CloseNoteMenu(); }
+
+    private void ShowPaneMenu(Guid? categoryId, MouseEventArgs e)
+    {
+        if (!CanEdit) return; // browser menu is left alone (preventDefault is conditional)
+        _menuX = Math.Max(4, e.ClientX);
+        _menuY = Math.Max(4, e.ClientY);
+        _menuCategoryId = categoryId;
+        _paneMenu = true;
+        _focusMenu = true;
+    }
+
+    private void AddFromMenu()
+    {
+        _newCategoryId = _menuCategoryId;
+        _paneMenu = false;
+        OpenNew(null);
+    }
+
+    /// <summary>Selecting a passage in the source: new note in the active category (if any), with the passage as its evidence.</summary>
+    private void NewFromSelection((int Start, int End) sel)
+    {
+        _newCategoryId = null;
+        OpenNew(sel);
+    }
+
+    private void OpenNew((int Start, int End)? source)
+    {
+        _newSource = source;
+        var evidence = new List<EvidenceDto>();
+        if (source is { } s && _workspace is not null)
+        {
+            foreach (var seg in _workspace.Segments)
+            {
+                var (a, b) = (Math.Max(s.Start, seg.Start), Math.Min(s.End, seg.End));
+                if (b > a && !string.IsNullOrWhiteSpace(_workspace.SourceText[a..b]))
+                    evidence.Add(new EvidenceDto(seg.Label, _workspace.SourceText[a..b], a, b, MatchQuality.Exact));
+            }
+        }
+        _newItem = BlankItem(evidence);
+        _editError = null;
+        _creating = true;
+    }
+
+    private async Task SaveNewItem(UpdateActionItemRequest r)
+    {
+        if (_workspace is null) return;
+        _editSaving = true;
+        _editError = null;
+        try
+        {
+            var created = await Api.CreateActionAsync(_workspace.Id,
+                new CreateActionItemRequest(r.Title, r.Summary, r.Owner, r.Due, r.Colour, _newCategoryId, _newSource?.Start, _newSource?.End), _cts.Token);
+            _actions.Add(created);
+            if (created.CategoryId is not null) _activeCategoryId = created.CategoryId;
+            _creating = false;
+        }
+        catch (ApiException ex) { _editError = ex.Message; }
+        catch (OperationCanceledException) { }
+        finally { _editSaving = false; }
+    }
+
+    private void EditFromMenu()
+    {
+        if (_menuItem is { } item) OpenItem(item);
+        _menuItem = null;
+    }
+
+    private async Task DeleteFromMenu()
+    {
+        var item = _menuItem;
+        _menuItem = null;
+        if (item is null || !CanEdit) return;
+
+        var freed = MergedCountOf(item);
+        var msg = $"Delete the note “{item.Title}”?\n\nThis can't be undone.";
+        if (freed > 0) msg += $"\n\nThe {freed} note{(freed == 1 ? "" : "s")} merged into it will reappear as separate notes.";
+        if (!await Dialogs.ConfirmAsync("Delete note", msg, "Delete", danger: true)) return;
+
+        try
+        {
+            ApplyActions(await Api.DeleteActionAsync(item.Id, _cts.Token));
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        catch (OperationCanceledException) { }
+    }
 
     private async Task SaveItem(UpdateActionItemRequest request)
     {
@@ -724,6 +858,11 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_focusMenu && (_menuItem is not null || _paneMenu))
+        {
+            _focusMenu = false;
+            try { await _menuFirst.FocusAsync(); } catch (InvalidOperationException) { }
+        }
         if (!_scrollPending) return;
         _scrollPending = false;
         await JS.InvokeVoidAsync("distillforge.scrollToFirstHighlight", "source-text");

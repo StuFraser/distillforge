@@ -1,6 +1,6 @@
 <div class="dialog-backdrop" @onclick="BackdropClick">
     <div class="dialog item-dialog" role="dialog" aria-modal="true" aria-labelledby="item-title" @onclick:stopPropagation="true">
-        <h2 id="item-title">@(ReadOnly ? "Action item (read-only)" : "Action item")</h2>
+        <h2 id="item-title">@(IsNew ? "New action item" : ReadOnly ? "Action item (read-only)" : "Action item")</h2>
 
         @if (Error is not null)
         {
@@ -117,7 +117,7 @@
             @if (!ReadOnly)
             {
                 <button type="button" class="secondary" @onclick="Reset" disabled="@(!IsDirty || Busy)">Reset</button>
-                <button type="button" class="primary" @onclick="Save" disabled="@(!IsDirty || !IsValid || Busy)">@(Busy ? "Saving…" : "Save")</button>
+                <button type="button" class="primary" @onclick="Save" disabled="@(!IsDirty || !IsValid || Busy)">@(Busy ? "Saving…" : IsNew ? "Add" : "Save")</button>
             }
         </div>
     </div>
@@ -126,6 +126,8 @@
 @code {
     [Parameter, EditorRequired] public ActionItemDto Item { get; set; } = default!;
     [Parameter] public bool ReadOnly { get; set; }
+    /// <summary>Creating a note: <see cref="Item"/> is a blank placeholder and Save is labelled Add.</summary>
+    [Parameter] public bool IsNew { get; set; }
     [Parameter] public bool Busy { get; set; }
     [Parameter] public string? Error { get; set; }
     [Parameter] public EventCallback<UpdateActionItemRequest> OnSave { get; set; }

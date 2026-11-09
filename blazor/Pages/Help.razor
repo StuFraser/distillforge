@@ -8,6 +8,7 @@
         <a href="help#start">Getting started</a>
         <a href="help#how">How extraction works</a>
         <a href="help#notes">Working with notes</a>
+        <a href="help#addnotes">Adding, editing and deleting notes</a>
         <a href="help#duplicates">Duplicates and merging</a>
         <a href="help#categories">Categories</a>
         <a href="help#workspaces">Workspaces</a>
@@ -60,11 +61,41 @@
             <ul>
                 <li><strong>Click a note</strong> to highlight its evidence in the source (click again to clear). A <span class="chip">low confidence</span> tag means the
                     model's quote couldn't be matched exactly, so the highlight covers the whole passage.</li>
-                <li><strong>⤢</strong> on a note opens it for editing: title, summary, owner, due date and colour. The source evidence is shown read-only.</li>
+                <li><strong>⤢</strong> on a note opens it for editing: title, summary, owner, due date and colour. The source evidence is shown read-only.
+                    You can also right-click a note; see <a href="help#addnotes">Adding, editing and deleting notes</a>.</li>
                 <li><strong>Colours:</strong> by default notes are pink, or yellow when they have a deadline. Choose any colour to override this; choosing the default colour goes back to automatic.</li>
                 <li><strong>Filters</strong> above the Uncategorised notes narrow the list by <em>Party</em> (owner), <em>Deadline</em> and <em>Duplicates</em> (only notes flagged ⚠ as possible duplicates). They only affect the Uncategorised panel.</li>
                 <li>A <strong>⚠</strong> before a title and a <span class="chip">+2 merged</span> tag mean the note has possible duplicates or other notes merged into it; see <a href="help#duplicates">Duplicates and merging</a>.</li>
             </ul>
+        </section>
+
+        <section id="addnotes">
+            <h2>Adding, editing and deleting notes</h2>
+            <p>You aren't limited to what the AI found. You can add your own notes, change any note, or remove ones you don't want.</p>
+
+            <h3>Right-click a note</h3>
+            <ul>
+                <li><strong>Edit</strong> opens the same details window as <strong>⤢</strong> (<em>View details</em>, read-only, in an archived workspace).</li>
+                <li><strong>Delete</strong> asks you to confirm, then removes the note and its evidence links. It can't be undone.
+                    If other notes were merged into it, they are not deleted: they reappear as separate notes, and the confirmation tells you how many.</li>
+            </ul>
+
+            <h3>Add a note: two ways</h3>
+            <ol>
+                <li><strong>Right-click empty space in a notes panel</strong> (the Uncategorised panel, or the category panel) and choose <strong>Add action item</strong>.
+                    Fill in the details and click <strong>Add</strong>. A note added in the category panel goes into the category that's showing; one added in the Uncategorised panel stays uncategorised.</li>
+                <li><strong>Select a passage in the source</strong> on the left. A <strong>＋ New note from selection</strong> button appears beside it; click it to open the same
+                    New action item window. The passage you selected is attached to the new note as its source evidence (shown in the window before you save),
+                    so clicking the note later highlights it just like an extracted note. Notes made this way start in Uncategorised.</li>
+            </ol>
+            <p>
+                A title is required; everything else is optional. Added notes are marked as yours, so <strong>re-extracting keeps them</strong> (see the note under
+                <a href="help#categories">Categories</a>).
+            </p>
+            <p class="note-callout">
+                None of this is available in an <strong>archived</strong> workspace (you can still open a note to read it), or while an extraction is running.
+                The source selection button needs a mouse or trackpad.
+            </p>
         </section>
 
         <section id="duplicates">
@@ -100,7 +131,8 @@
                     Dragging needs a mouse or trackpad; touch screens aren't supported yet.</li>
                 <li>Notes keep their own colour inside a category; the category's colour only accents its tab.</li>
             </ul>
-            <p class="note-callout">Re-extracting a document replaces its extracted notes, including any you've edited or filed into categories. Categories themselves are kept.</p>
+            <p class="note-callout">Re-extracting a document replaces its extracted notes, including any you've edited or filed into categories. Categories themselves are kept,
+                and so are notes you added yourself.</p>
         </section>
 
         <section id="workspaces">
@@ -109,7 +141,7 @@
             <ul>
                 <li>Switch with the dropdown above the source; <strong>+ New</strong> starts another.</li>
                 <li><strong>Replace Source</strong> swaps the document and clears everything derived from it (notes, categories, previous results).</li>
-                <li><strong>Re-extract</strong> runs the AI again on the same text, optionally with a different model, and asks first because it replaces the extracted notes.</li>
+                <li><strong>Re-extract</strong> runs the AI again on the same text, optionally with a different model, and asks first because it replaces the extracted notes (notes you added yourself are kept).</li>
                 <li><strong>Archive</strong> hides a workspace and makes it read-only. Tick <em>Show archived</em> to see archived ones; <strong>Unarchive</strong> restores editing.</li>
             </ul>
         </section>

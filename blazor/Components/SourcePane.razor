@@ -1,27 +1,45 @@
-@* Read-only source viewer. Text is split into runs around highlight ranges; offsets are against the canonical source. *@
+@* Source viewer. Text is split into runs around highlight ranges; offsets are against the canonical source.
+   Each run carries its start offset (data-s) so a browser text selection can be mapped back to source offsets. *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
 <div class="source-text" id="@ContainerId">
     @foreach (var run in _runs)
     {
         var text = Text.Substring(run.Start, run.End - run.Start);
         if (run.Highlight is { } q)
         {
-            <mark class="hl hl-@q.ToString().ToLowerInvariant()" title="@(q == MatchQuality.Segment ? "Low confidence: quote not found, whole segment shown" : null)">@text</mark>
+            <mark data-s="@run.Start" class="hl hl-@q.ToString().ToLowerInvariant()" title="@(q == MatchQuality.Segment ? "Low confidence: quote not found, whole segment shown" : null)">@text</mark>
         }
         else
         {
-            @text
+            <span data-s="@run.Start">@text</span>
         }
     }
 </div>
+
+@if (_selection is { } sel && AllowCreate)
+{
+    <button type="button" class="selection-action" style="left:@(_x)px; top:@(_y)px"
+            @onmousedown:preventDefault="true" @onclick="() => CreateAsync(sel)">＋ New note from selection</button>
+}
 
 @code {
     [Parameter, EditorRequired] public string Text { get; set; } = "";
     [Parameter] public IReadOnlyList<HighlightRange> Highlights { get; set; } = [];
     [Parameter] public string ContainerId { get; set; } = "source-text";
+    /// <summary>Show the "new note from selection" button when text is selected.</summary>
+    [Parameter] public bool AllowCreate { get; set; }
+    /// <summary>The user chose to create a note from the selected passage (source offsets, End exclusive).</summary>
+    [Parameter] public EventCallback<(int Start, int End)> OnCreateFromSelection { get; set; }
 
     private IReadOnlyList<TextRun> _runs = [];
     private string? _lastText;
     private IReadOnlyList<HighlightRange>? _lastHighlights;
+    private (int Start, int End)? _selection;
+    private double _x, _y;
+    private DotNetObjectReference<SourcePane>? _self;
+    private IJSObjectReference? _watcher;
 
     protected override void OnParametersSet()
     {
@@ -29,5 +47,37 @@
         _lastText = Text;
         _lastHighlights = Highlights;
         _runs = TextRunBuilder.Build(Text.Length, Highlights);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _self = DotNetObjectReference.Create(this);
+        _watcher = await JS.InvokeAsync<IJSObjectReference>("distillforge.watchSelection", ContainerId, _self);
+    }
+
+    [JSInvokable]
+    public void OnSelectionChanged(int start, int end, double right, double bottom)
+    {
+        var next = start >= 0 && end > start ? ((int, int)?)(start, end) : null;
+        if (next == _selection && (next is null || (right == _x && bottom == _y))) return;
+        _selection = next;
+        // Keep the button on screen (it is ~210px wide).
+        _x = Math.Max(8, right - 10);
+        _y = bottom + 6;
+        StateHasChanged();
+    }
+
+    private async Task CreateAsync((int Start, int End) sel)
+    {
+        _selection = null;
+        await OnCreateFromSelection.InvokeAsync(sel);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { if (_watcher is not null) { await _watcher.InvokeVoidAsync("dispose"); await _watcher.DisposeAsync(); } }
+        catch (JSDisconnectedException) { }
+        _self?.Dispose();
     }
 }
