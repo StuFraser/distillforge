@@ -37,7 +37,9 @@ public sealed record ActionItemDto(
     bool IsManual,
     int SortOrder,
     IReadOnlyList<EvidenceDto> Evidence,
-    string? Colour = null);
+    string? Colour = null,
+    Guid? MergedIntoId = null,
+    IReadOnlyList<Guid>? PossibleDuplicateIds = null);
 
 public sealed record EvidenceDto(string SegmentLabel, string Quote, int Start, int End, MatchQuality MatchQuality);
 

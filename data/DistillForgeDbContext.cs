@@ -10,6 +10,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<ActionItem> ActionItems => Set<ActionItem>();
     public DbSet<Evidence> Evidence => Set<Evidence>();
+    public DbSet<ActionItemLink> ActionItemLinks => Set<ActionItemLink>();
     public DbSet<ExtractionRun> ExtractionRuns => Set<ExtractionRun>();
     public DbSet<AiProvider> AiProviders => Set<AiProvider>();
     public DbSet<AiModel> AiModels => Set<AiModel>();
@@ -48,6 +49,8 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             // Removing a category moves its notes back to Uncategorised.
             e.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(x => new { x.WorkspaceId, x.CategoryId });
+            // Deleting a parent frees its merged notes rather than deleting them.
+            e.HasOne<ActionItem>().WithMany().HasForeignKey(x => x.MergedIntoId).OnDelete(DeleteBehavior.SetNull);
         });
 
         b.Entity<Evidence>(e =>
@@ -66,6 +69,16 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             // Deleting a model keeps the run (and its Model string) but forgets which config produced it.
             e.HasOne<AiModel>().WithMany().HasForeignKey(x => x.AiModelId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(x => x.Workspace).WithMany(w => w.ExtractionRuns).HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<ActionItemLink>(e =>
+        {
+            e.Property(x => x.Source).HasConversion<string>().HasMaxLength(16);
+            e.HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<ActionItem>().WithMany().HasForeignKey(x => x.ActionItemAId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<ActionItem>().WithMany().HasForeignKey(x => x.ActionItemBId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.ActionItemAId, x.ActionItemBId }).IsUnique();
+            e.HasIndex(x => x.WorkspaceId);
         });
 
         b.Entity<AiProvider>(e =>

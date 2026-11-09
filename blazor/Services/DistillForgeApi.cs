@@ -87,6 +87,19 @@ public sealed class DistillForgeApi(HttpClient http)
         if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound) throw await ToException(response, ct);
     }
 
+    // Each of these returns the workspace's full note list (merged notes included).
+    public async Task<List<ActionItemDto>> MergeActionAsync(Guid id, Guid targetId, CancellationToken ct = default) =>
+        await Send<List<ActionItemDto>>(() => http.PostAsJsonAsync($"actions/{id}/merge", new MergeActionItemRequest(targetId), ct), ct)
+        ?? throw new ApiException("That note no longer exists.");
+
+    public async Task<List<ActionItemDto>> UnmergeActionAsync(Guid id, CancellationToken ct = default) =>
+        await Send<List<ActionItemDto>>(() => http.PostAsync($"actions/{id}/unmerge", null, ct), ct)
+        ?? throw new ApiException("That note no longer exists.");
+
+    public async Task<List<ActionItemDto>> DismissDuplicateAsync(Guid id, Guid otherId, CancellationToken ct = default) =>
+        await Send<List<ActionItemDto>>(() => http.PostAsJsonAsync($"actions/{id}/not-duplicate", new NotDuplicateRequest(otherId), ct), ct)
+        ?? throw new ApiException("That note no longer exists.");
+
     /// <summary>Starts a run (202), or returns the run already in progress (409). A null model means the server picks (last used, else default).</summary>
     public async Task<ExtractionRunDto> StartExtractionAsync(Guid workspaceId, Guid? aiModelId = null, CancellationToken ct = default)
     {

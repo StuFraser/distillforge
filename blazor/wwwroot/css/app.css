@@ -280,3 +280,36 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ok-note { margin: 0; padding: 8px 12px; background: #e7f6ec; border-left: 4px solid var(--ok); border-radius: 4px; font-size: 0.9rem; }
 .model-picker { max-width: 220px; min-width: 0; font: inherit; font-size: 0.85rem; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 6px; }
 .panel-footer { align-items: center; flex-wrap: wrap; }
+
+/* Help page */
+a.icon-button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
+.help-page { height: 100%; overflow-y: auto; display: grid; grid-template-columns: 200px minmax(0, 760px); gap: 32px; justify-content: center; align-content: start; }
+.help-toc { position: sticky; top: 0; align-self: start; display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; padding-top: 8px; }
+.help-toc a { color: var(--muted); text-decoration: none; padding: 3px 0; }
+.help-toc a:hover { color: var(--accent); }
+.help-body { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 8px 32px 32px; line-height: 1.55; font-size: 0.95rem; }
+.help-body h1 { font-size: 1.6rem; letter-spacing: -0.02em; }
+.help-body h2 { font-size: 1.2rem; margin: 32px 0 8px; padding-top: 8px; border-top: 1px solid var(--border); scroll-margin-top: 8px; }
+.help-body h3 { font-size: 1rem; margin: 18px 0 6px; }
+.help-body .lead { font-size: 1.05rem; color: #374151; }
+.help-body ul, .help-body ol { padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
+.help-body code, .help-body kbd { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 0.85em; }
+.help-body dt { font-weight: 600; margin-top: 12px; }
+.help-body dd { margin: 2px 0 0 0; color: #374151; }
+.note-callout { background: #fff4e5; border-left: 4px solid #f59e0b; padding: 8px 12px; border-radius: 4px; }
+.formula { background: var(--accent-soft); border-radius: 8px; padding: 10px 14px; font-weight: 500; }
+.help-table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin: 8px 0 12px; }
+.help-table th, .help-table td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+.help-table thead th { background: var(--bg); }
+@media (max-width: 800px) { .help-page { grid-template-columns: 1fr; } .help-toc { position: static; flex-direction: row; flex-wrap: wrap; gap: 10px; } .help-body { padding: 8px 18px 24px; } }
+
+/* Merging and possible duplicates */
+.dup-flag { color: #b54708; margin-right: 4px; }
+.chip-merged { background: #eef2ff; color: #3730a3; }
+.note-wrap.droppable .note, .note-wrap.droppable .note-zoom { pointer-events: none; } /* keeps dragenter/leave on the card itself */
+.note-wrap.merge-target .note { outline: 3px dashed var(--accent); outline-offset: 2px; transform: scale(1.03); }
+.dup-section { display: flex; flex-direction: column; gap: 8px; }
+.dup-card { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; background: #fafbfc; }
+.dup-title { font-weight: 600; font-size: 0.9rem; }
+.dup-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.item-dialog .dup-actions button.secondary { font-size: 0.8rem; padding: 4px 10px; }

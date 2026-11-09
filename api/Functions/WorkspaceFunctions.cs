@@ -21,7 +21,7 @@ public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceServic
         var rows = await db.Workspaces.AsNoTracking()
             .Where(w => includeArchived || !w.IsArchived)
             .OrderByDescending(w => w.UpdatedAt)
-            .Select(w => new { Workspace = w, Count = w.ActionItems.Count })
+            .Select(w => new { Workspace = w, Count = w.ActionItems.Count(a => a.MergedIntoId == null) })
             .ToListAsync(ct);
         return new OkObjectResult(rows.Select(r => r.Workspace.ToSummaryDto(r.Count)));
     }
@@ -103,12 +103,7 @@ public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceServic
         Guid id,
         CancellationToken ct)
     {
-        var items = await db.ActionItems.AsNoTracking()
-            .Where(a => a.WorkspaceId == id)
-            .Include(a => a.Evidence).ThenInclude(e => e.Segment)
-            .OrderBy(a => a.SortOrder)
-            .ToListAsync(ct);
-        return new OkObjectResult(items.Select(a => a.ToDto()));
+        return new OkObjectResult(await ActionItemQueries.LoadDtosAsync(db, id, ct));
     }
 
     private async Task<IActionResult> SetArchived(Guid id, bool archived, CancellationToken ct)
@@ -121,7 +116,7 @@ public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceServic
             w.IsArchived = archived;
             await db.SaveChangesAsync(ct);
         }
-        return new OkObjectResult(w.ToSummaryDto(await db.ActionItems.CountAsync(a => a.WorkspaceId == id, ct)));
+        return new OkObjectResult(w.ToSummaryDto(await db.ActionItems.CountAsync(a => a.WorkspaceId == id && a.MergedIntoId == null, ct)));
     }
 
     internal static async Task<T?> ReadBody<T>(HttpRequest req, CancellationToken ct) where T : class

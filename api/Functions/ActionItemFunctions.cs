@@ -35,7 +35,8 @@ public sealed class ActionItemFunctions(DistillForgeDbContext db)
         item.Workspace.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        return new OkObjectResult(item.ToDto());
+        var dtos = await ActionItemQueries.LoadDtosAsync(db, item.WorkspaceId, ct);
+        return new OkObjectResult(dtos.First(d => d.Id == id));
     }
 
     private static string? Blank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();

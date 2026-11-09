@@ -112,9 +112,16 @@ public sealed class CategoryFunctions(DistillForgeDbContext db)
             !await db.Categories.AnyAsync(c => c.Id == cid && c.WorkspaceId == item.WorkspaceId, ct))
             return new BadRequestObjectResult("That category doesn't belong to this note's workspace.");
 
+        if (item.MergedIntoId is not null)
+            return new BadRequestObjectResult("This note is merged into another and follows it; move the other note instead.");
+
         item.CategoryId = body.CategoryId;
+        // Merged notes follow their parent.
+        foreach (var child in await db.ActionItems.Where(a => a.MergedIntoId == id).ToListAsync(ct))
+            child.CategoryId = body.CategoryId;
         item.Workspace.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
-        return new OkObjectResult(item.ToDto());
+        var dtos = await ActionItemQueries.LoadDtosAsync(db, item.WorkspaceId, ct);
+        return new OkObjectResult(dtos.First(d => d.Id == id));
     }
 }

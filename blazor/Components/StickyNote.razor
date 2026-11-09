@@ -1,12 +1,21 @@
 @* A wrapper holds two sibling buttons (select + zoom); buttons can't be nested validly. *@
-<div class="note-wrap @(Dragging ? "dragging" : "")" draggable="@(Draggable ? "true" : "false")" @ondragstart="OnDragStart" @ondragend="OnDragEnd">
+<div class="note-wrap @(Dragging ? "dragging" : "") @(Droppable ? "droppable" : "") @(MergeTarget ? "merge-target" : "")"
+     draggable="@(Draggable ? "true" : "false")" @ondragstart="OnDragStart" @ondragend="OnDragEnd"
+     @ondragenter="OnDragEnterNote" @ondragenter:stopPropagation="true"
+     @ondragover:preventDefault="Droppable" @ondragover:stopPropagation="Droppable"
+     @ondragleave="OnDragLeaveNote"
+     @ondrop="OnDropNote" @ondrop:preventDefault="Droppable" @ondrop:stopPropagation="Droppable">
     <button type="button" class="note @(Selected ? "selected" : "")" style="--note-colour: var(--note-@ColourKey)" @onclick="OnClick" title="@Item.Summary" aria-pressed="@Selected">
-        <span class="note-title">@Item.Title</span>
-        @if (!string.IsNullOrEmpty(Item.Owner) || !string.IsNullOrEmpty(Item.Due) || LowConfidence)
+        <span class="note-title">
+            @if (PossibleDuplicate) { <span class="dup-flag" title="Possible duplicate: open the note (⤢) to review" aria-label="Possible duplicate">⚠</span> }
+            @Item.Title
+        </span>
+        @if (!string.IsNullOrEmpty(Item.Owner) || !string.IsNullOrEmpty(Item.Due) || LowConfidence || MergedCount > 0)
         {
             <span class="note-meta">
                 @if (!string.IsNullOrEmpty(Item.Owner)) { <span class="chip" title="Owner: @Item.Owner">@Item.Owner</span> }
                 @if (!string.IsNullOrEmpty(Item.Due)) { <span class="chip chip-due" title="Due: @Item.Due">@Item.Due</span> }
+                @if (MergedCount > 0) { <span class="chip chip-merged" title="@MergedCount note(s) merged into this one">+@MergedCount merged</span> }
                 @if (LowConfidence) { <span class="chip chip-flag" title="Some evidence couldn't be matched exactly">low confidence</span> }
             </span>
         }
@@ -23,6 +32,14 @@
     [Parameter] public bool Dragging { get; set; }
     [Parameter] public EventCallback OnDragStart { get; set; }
     [Parameter] public EventCallback OnDragEnd { get; set; }
+    /// <summary>Another note is being dragged and this one can receive it (merge).</summary>
+    [Parameter] public bool Droppable { get; set; }
+    [Parameter] public bool MergeTarget { get; set; }
+    [Parameter] public bool PossibleDuplicate { get; set; }
+    [Parameter] public int MergedCount { get; set; }
+    [Parameter] public EventCallback OnDragEnterNote { get; set; }
+    [Parameter] public EventCallback OnDragLeaveNote { get; set; }
+    [Parameter] public EventCallback OnDropNote { get; set; }
 
     /// <summary>The chosen colour, or automatic: yellow when the note has a deadline, otherwise pink.</summary>
     private string ColourKey => Item.Colour is { } c && NoteColours.IsValid(c)

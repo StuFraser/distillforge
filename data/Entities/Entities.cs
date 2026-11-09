@@ -55,6 +55,8 @@ public class ActionItem
     public Guid WorkspaceId { get; set; }
     public Guid? CategoryId { get; set; }
     public Guid? ExtractionRunId { get; set; }
+    /// <summary>Set when this note was merged into another (its parent). Merged notes stay as full records, are hidden in the UI and follow the parent's category.</summary>
+    public Guid? MergedIntoId { get; set; }
     public required string Title { get; set; }
     public string? Summary { get; set; }
     public string? Owner { get; set; }
@@ -142,4 +144,19 @@ public class AiModel
     public bool IsDefault { get; set; }
 
     public AiProvider? Provider { get; set; }
+}
+
+public enum DuplicateSource { Ai, Similarity }
+
+/// <summary>A "these two notes may be the same task" flag. Pairs are stored once, with A &lt; B.</summary>
+public class ActionItemLink
+{
+    public Guid Id { get; set; }
+    public Guid WorkspaceId { get; set; }
+    public Guid ActionItemAId { get; set; }
+    public Guid ActionItemBId { get; set; }
+    public DuplicateSource Source { get; set; }
+    /// <summary>The user said "not a duplicate".</summary>
+    public bool Dismissed { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
 }

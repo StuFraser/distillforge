@@ -26,6 +26,19 @@ public static class ActionPointDeduplicator
         return kept;
     }
 
+    /// <summary>
+    /// Pairs of points (indexes) whose titles look alike wherever they sit in the document. Run AFTER <see cref="Merge"/>,
+    /// which already folded the nearby ones, so what's left are far-apart candidates: flagged, never merged.
+    /// </summary>
+    public static IReadOnlyList<(int A, int B)> SimilarPairs(IReadOnlyList<ValidatedActionPoint> points)
+    {
+        var pairs = new List<(int, int)>();
+        for (int i = 0; i < points.Count; i++)
+            for (int j = i + 1; j < points.Count; j++)
+                if (TitlesSimilar(points[i].Title, points[j].Title)) pairs.Add((i, j));
+        return pairs;
+    }
+
     public static bool IsDuplicate(ValidatedActionPoint a, ValidatedActionPoint b) =>
         NearbyEvidence(a, b) && TitlesSimilar(a.Title, b.Title);
 

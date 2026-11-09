@@ -1,0 +1,219 @@
+@page "/help"
+
+<PageTitle>Help · DistillForge</PageTitle>
+
+<div class="help-page">
+    <nav class="help-toc" aria-label="Help contents">
+        <strong>Contents</strong>
+        <a href="help#start">Getting started</a>
+        <a href="help#how">How extraction works</a>
+        <a href="help#notes">Working with notes</a>
+        <a href="help#duplicates">Duplicates and merging</a>
+        <a href="help#categories">Categories</a>
+        <a href="help#workspaces">Workspaces</a>
+        <a href="help#ai">Setting up AI</a>
+        <a href="help#tuning">Getting better results</a>
+        <a href="help#trouble">Troubleshooting</a>
+        <a href="help#privacy">Your data</a>
+    </nav>
+
+    <article class="help-body">
+        <h1>DistillForge help</h1>
+        <p class="lead">
+            DistillForge reads a document (a meeting transcript, a plan, an email thread), uses an AI model to pull out the action points,
+            and shows them as sticky notes you can sort into categories. Every note links back to the passage it came from.
+        </p>
+
+        <section id="start">
+            <h2>Getting started</h2>
+            <ol>
+                <li><strong>Set up an AI model</strong> (once). Click <kbd>⚙</kbd> in the top bar and add a provider and a model. See <a href="help#ai">Setting up AI</a>.</li>
+                <li>Click <strong>Add Source</strong> (or <strong>+ New</strong>), paste your text, choose the document type if you know it, and pick the AI model to use.</li>
+                <li>Click <strong>Add and extract</strong>. A progress window shows the work; you can <em>Hide</em> it or <em>Cancel extraction</em>.</li>
+                <li>New notes appear in the <strong>Uncategorised</strong> panel. Click a note to see where it came from in the source text on the left.</li>
+                <li>Create categories along the bottom and drag notes into them.</li>
+            </ol>
+        </section>
+
+        <section id="how">
+            <h2>How extraction works</h2>
+            <p>
+                AI models can only read a limited amount of text at once (their <em>context window</em>). DistillForge splits your document
+                into passages and sends them in <strong>windows</strong> that fit. Neighbouring windows overlap slightly so a task that
+                straddles a boundary isn't missed.
+            </p>
+            <ul>
+                <li><strong>Pass 1 · Extracting</strong>: the model reads each window and returns action points, each with a short quote from the source.
+                    The app finds those quotes in your document itself, so the highlight is exact and the model can't invent locations.</li>
+                <li><strong>Pass 2 · Consolidating</strong>: when there was more than one window, the model is asked which notes describe the same task.
+                    Clear repeats are merged. It can only suggest merges; the app does the merging, so evidence is never lost or rewritten.
+                    Notes that <em>might</em> be the same task are not merged but flagged for you (see <a href="help#duplicates">Duplicates and merging</a>).</li>
+                <li>A window that fails is skipped with a warning rather than failing the whole run. Hover the status line above the notes to see warnings.</li>
+            </ul>
+            <p>
+                <strong>Cancel extraction</strong> stops the run within a few seconds. Your existing notes are not changed: new notes are only saved when a run finishes.
+            </p>
+        </section>
+
+        <section id="notes">
+            <h2>Working with notes</h2>
+            <ul>
+                <li><strong>Click a note</strong> to highlight its evidence in the source (click again to clear). A <span class="chip">low confidence</span> tag means the
+                    model's quote couldn't be matched exactly, so the highlight covers the whole passage.</li>
+                <li><strong>⤢</strong> on a note opens it for editing: title, summary, owner, due date and colour. The source evidence is shown read-only.</li>
+                <li><strong>Colours:</strong> by default notes are pink, or yellow when they have a deadline. Choose any colour to override this; choosing the default colour goes back to automatic.</li>
+                <li><strong>Filters</strong> above the Uncategorised notes narrow the list by <em>Party</em> (owner) and <em>Deadline</em>. They only affect the Uncategorised panel.</li>
+            </ul>
+        </section>
+
+        <section id="duplicates">
+            <h2>Duplicates and merging</h2>
+            <p>
+                The same task is sometimes raised more than once: a request near the start of a meeting and a confirmation at the close, for example.
+                These can be real, separate notes or two mentions of one task, so DistillForge flags them and lets you decide.
+            </p>
+            <ul>
+                <li>A <strong>⚠</strong> before a note's title means it is a <em>possible duplicate</em> of another note. Use the <em>Duplicates</em> filter to show only those.</li>
+                <li>Open the note (<strong>⤢</strong>) to see the notes it might duplicate, with their owner, due date and category. For each one you can
+                    <strong>Merge it into this note</strong>, <strong>Merge this into it</strong>, or say <strong>Not a duplicate</strong> to clear the flag.</li>
+                <li><strong>Drag a note onto another note</strong> to merge it into that one (you'll be asked to confirm).</li>
+                <li>A merged note is hidden from the main view and follows the note it was merged into, including its category. The note that absorbed it shows a
+                    <span class="chip">+1 merged</span> tag, and clicking it highlights the source passages of all of them.</li>
+                <li>Nothing is lost. A merged note keeps its own text and evidence, and <strong>Unmerge</strong> in the parent's details brings it back as a separate note.</li>
+            </ul>
+            <p class="note-callout">Merging into a note that has already absorbed others keeps everything in one group; a note can only be merged one level deep.
+                Flags appear on notes from a new extraction. Re-extract an older workspace to get them.</p>
+        </section>
+
+        <section id="categories">
+            <h2>Categories</h2>
+            <ul>
+                <li><strong>＋</strong> adds a category (name and an optional accent colour). Names must be unique within a workspace.</li>
+                <li><strong>✎</strong> (or double-click a tab) renames or recolours the selected category. <strong>✕</strong> deletes it; its notes go back to Uncategorised.</li>
+                <li><strong>Drag and drop:</strong> drag a note from Uncategorised onto a category tab, or into the category area. Drag it back onto the Uncategorised panel to uncategorise it.
+                    Dragging needs a mouse or trackpad; touch screens aren't supported yet.</li>
+                <li>Notes keep their own colour inside a category; the category's colour only accents its tab.</li>
+            </ul>
+            <p class="note-callout">Re-extracting a document replaces its extracted notes, including any you've edited or filed into categories. Categories themselves are kept.</p>
+        </section>
+
+        <section id="workspaces">
+            <h2>Workspaces</h2>
+            <p>Each document lives in its own workspace, with its own notes and categories.</p>
+            <ul>
+                <li>Switch with the dropdown above the source; <strong>+ New</strong> starts another.</li>
+                <li><strong>Replace Source</strong> swaps the document and clears everything derived from it (notes, categories, previous results).</li>
+                <li><strong>Re-extract</strong> runs the AI again on the same text, optionally with a different model, and asks first because it replaces the extracted notes.</li>
+                <li><strong>Archive</strong> hides a workspace and makes it read-only. Tick <em>Show archived</em> to see archived ones; <strong>Unarchive</strong> restores editing.</li>
+            </ul>
+        </section>
+
+        <section id="ai">
+            <h2>Setting up AI</h2>
+            <p>
+                DistillForge works with any service that speaks the OpenAI chat-completions API: local servers such as <strong>Ollama</strong> or <strong>LM Studio</strong>,
+                or hosted ones such as <strong>OpenAI</strong> and <strong>OpenRouter</strong>. Click <kbd>⚙</kbd> to manage them.
+            </p>
+            <h3>Providers</h3>
+            <ul>
+                <li><strong>Base URL</strong> must include the version path, usually <code>/v1</code> (for example <code>http://localhost:11434/v1</code>).</li>
+                <li><strong>API key</strong>: leave blank for local servers that don't need one. Keys are encrypted on the server and never shown again; use <em>Replace</em> or <em>Remove</em> to change one.</li>
+                <li><strong>Test connection</strong> checks the URL and key and lists the models the server offers.</li>
+                <li>Presets fill in the URL for common services.</li>
+            </ul>
+            <h3>Models</h3>
+            <p>A provider can have several models. For each one you set:</p>
+            <ul>
+                <li><strong>Model ID</strong>: pick from the list or type it exactly as the service names it (for example <code>llama3.1:8b</code>).</li>
+                <li><strong>Context window</strong>: how many tokens the model is actually run with. This can't be discovered automatically. For Ollama, use the <code>num_ctx</code> it runs with, not the model's advertised maximum.</li>
+                <li><strong>Reserved output</strong>: tokens kept free for the model's answer. It must be smaller than the context window.</li>
+                <li><strong>Structured output</strong>: <em>JSON schema</em> is the most reliable. If a service rejects it, try <em>JSON object</em>, then <em>None</em>.</li>
+                <li><strong>Default</strong>: the model used when you don't choose one. The first model you add becomes the default.</li>
+            </ul>
+            <p>Choose the model for each extraction from the dropdown next to <em>Re-extract</em> or in the Add Source window. A workspace remembers the model it last used.</p>
+        </section>
+
+        <section id="tuning">
+            <h2>Getting better results</h2>
+            <p>
+                The <strong>context window</strong> and <strong>reserved output</strong> settings do more than tell the app what the model can handle: they decide
+                <em>how big each window is</em>, and window size affects the quality of what comes back.
+            </p>
+            <p class="formula">Space for document text in each window ≈ (context window − reserved output) × 90%, less the instructions sent with it.</p>
+
+            <h3>Smaller windows often find more</h3>
+            <p>
+                A model tends to return a limited number of items per answer, however long the text. Giving it a long document in one go can mean it picks out only the most
+                prominent points. Splitting the same document into more, smaller windows gives it a closer read of each part, and usually surfaces more of the quieter commitments.
+                The trade-offs:
+            </p>
+            <table class="help-table">
+                <thead><tr><th></th><th>Larger windows</th><th>Smaller windows</th></tr></thead>
+                <tbody>
+                    <tr><th>Notes found</th><td>Fewer, higher-level</td><td>More, more detailed</td></tr>
+                    <tr><th>Risk</th><td>Missed items</td><td>Fragments of one task, or near-duplicates</td></tr>
+                    <tr><th>Speed and cost</th><td>Fewer model calls</td><td>More calls, slower, more tokens</td></tr>
+                    <tr><th>Duplicates</th><td>Little to merge</td><td>Relies on the consolidation pass</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Try it yourself</h3>
+            <ol>
+                <li>Extract with your model's normal settings and note how many notes you get.</li>
+                <li>Open <kbd>⚙</kbd>, edit the model, and lower the context window (a good first experiment for a local 8B model is <strong>4096</strong> with <strong>2048</strong> reserved).</li>
+                <li>Click <strong>Re-extract</strong> and compare. Judge by whether the extra notes are real, separate tasks, not just by how many there are.</li>
+                <li>Keep the setting that gives you the most useful notes without lots of fragments or repeats.</li>
+            </ol>
+            <p><strong>Tips</strong></p>
+            <ul>
+                <li>Don't go too small: very small windows chop up context and can produce fragments. Windows of a few thousand tokens are usually a sensible floor.</li>
+                <li>Check the status line for <em>"Consolidation skipped"</em>. With many notes and a small window, the list can be too big to send for the duplicate check, so scan the results for repeats yourself.</li>
+                <li>Never set the context window higher than the server really runs the model with; text beyond it is silently cut off. The app warns when reported prompt size looks far below what it sent.</li>
+                <li>Different models behave differently. It's worth trying the same document on two or three, using the model dropdown.</li>
+                <li>Telling the document type apart (<em>Transcript</em> or <em>Prose</em>) when you add it can help the app split the text sensibly. Auto-detect is usually right.</li>
+            </ul>
+        </section>
+
+        <section id="trouble">
+            <h2>Troubleshooting</h2>
+            <dl>
+                <dt>"Could not reach the API"</dt>
+                <dd>The web app can't contact the server. Check the API is running and reload the page.</dd>
+
+                <dt>"No AI model is configured"</dt>
+                <dd>Add a provider and a model under <kbd>⚙</kbd>, or ask whoever runs your server to set the default AI settings.</dd>
+
+                <dt>Test connection fails</dt>
+                <dd>Check the base URL ends in <code>/v1</code> (or your service's version path), that the server is reachable from the machine running the API (not just your browser), and the API key is right.
+                    Some services don't list their models; you can still type the model ID by hand.</dd>
+
+                <dt>Extraction failed, or "interrupted"</dt>
+                <dd>Read the message in the status line. "Interrupted" means the server stopped the job (for example a very long run timed out). Try a faster model or larger windows, or split the document.</dd>
+
+                <dt>"Response was truncated"</dt>
+                <dd>The model ran out of output space. Raise <em>Reserved output</em> (keeping it below the context window) or use smaller windows.</dd>
+
+                <dt>Too few notes, or missing obvious ones</dt>
+                <dd>Try smaller windows (see above), a stronger model, or check for failed windows in the warnings.</dd>
+
+                <dt>Duplicate or near-identical notes</dt>
+                <dd>Common with very small windows, especially if consolidation was skipped (see the status line). Look for the ⚠ flag and merge them (see
+                    <a href="help#duplicates">Duplicates and merging</a>), or re-extract with slightly larger windows.</dd>
+
+                <dt>A note's highlight is a whole passage, not a phrase</dt>
+                <dd>That's the <span class="chip">low confidence</span> tag: the model's quote couldn't be matched exactly, so the whole segment is shown.</dd>
+
+                <dt>Saving an API key fails</dt>
+                <dd>The server needs an encryption key configured (<code>Encryption__Key</code>). Providers that need no key (such as local Ollama) work without it.</dd>
+            </dl>
+        </section>
+
+        <section id="privacy">
+            <h2>Your data</h2>
+            <ul>
+                <li>The text you add is sent to the AI provider <em>you</em> configure for extraction. If that's a hosted service, your text leaves your network; use a local model for sensitive documents.</li>
+                <li>Documents, notes and categories are stored in the DistillForge database. API keys are stored encrypted and are never sent back to the browser.</li>
+            </ul>
+        </section>
+    </article>
+</div>

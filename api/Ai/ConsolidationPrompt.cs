@@ -21,9 +21,15 @@ public static class ConsolidationPrompt
         Do not rewrite or invent anything.
 
         For each group return the id to keep and the ids of the duplicates to fold into it.
+
+        Separately, list in "possible" any candidates that MIGHT be the same underlying task but that you are
+        not sure enough about to merge, so a person can review them. Typical cases: something requested or agreed
+        early on and then confirmed, restated or followed up later; or the same task described in different words.
+        Never put an id in both "merges" and "possible", and do not list tasks that are merely on the same topic.
+
         Respond with JSON only, in this shape:
-        {"merges":[{"keep":"c3","duplicates":["c7","c9"]}]}
-        If nothing should be merged, respond with {"merges":[]}.
+        {"merges":[{"keep":"c3","duplicates":["c7","c9"]}],"possible":[{"ids":["c2","c11"]}]}
+        Use an empty list for either key when nothing applies.
         """;
 
     public static string BuildUserMessage(IReadOnlyList<ConsolidationCandidate> candidates)
@@ -48,9 +54,23 @@ public static class ConsolidationPrompt
     {
         ["type"] = "object",
         ["additionalProperties"] = false,
-        ["required"] = new JsonArray("merges"),
+        ["required"] = new JsonArray("merges", "possible"),
         ["properties"] = new JsonObject
         {
+            ["possible"] = new JsonObject
+            {
+                ["type"] = "array",
+                ["items"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["additionalProperties"] = false,
+                    ["required"] = new JsonArray("ids"),
+                    ["properties"] = new JsonObject
+                    {
+                        ["ids"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } },
+                    },
+                },
+            },
             ["merges"] = new JsonObject
             {
                 ["type"] = "array",

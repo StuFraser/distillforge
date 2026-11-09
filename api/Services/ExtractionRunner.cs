@@ -74,6 +74,7 @@ public sealed class ExtractionRunner(
 
             var warnings = new List<string>();
             var found = new List<ValidatedActionPoint>();
+            var aiPossible = new List<(ValidatedActionPoint A, ValidatedActionPoint B)>(); // flagged by the model, never merged
             int? promptTokens = null, completionTokens = null;
             string? model = null, finishReason = null;
             string? lastFailure = null;
@@ -131,6 +132,8 @@ public sealed class ExtractionRunner(
                     {
                         var result = await extractor.ConsolidateAsync(candidates, ct);
                         var outcome = ActionPointConsolidator.Apply(merged, result.Response);
+                        foreach (var (a, b) in ActionPointConsolidator.PossiblePairs(result.Response, outcome.FinalIndexOf))
+                            aiPossible.Add((outcome.ActionPoints[a], outcome.ActionPoints[b]));
                         merged = outcome.ActionPoints.ToList();
                         warnings.AddRange(result.Warnings.Concat(outcome.Warnings).Select(w => "Consolidation: " + w));
                         promptTokens = Add(promptTokens, result.Usage?.PromptTokens);
@@ -154,11 +157,14 @@ public sealed class ExtractionRunner(
             var segmentIds = workspace.Segments.ToDictionary(s => s.Label, s => s.Id);
             var now = DateTimeOffset.UtcNow;
             int order = 0;
+            var itemIds = new Dictionary<ValidatedActionPoint, Guid>(ReferenceEqualityComparer.Instance);
             foreach (var ap in merged)
             {
+                var itemId = Guid.CreateVersion7();
+                itemIds[ap] = itemId;
                 db.ActionItems.Add(new ActionItem
                 {
-                    Id = Guid.CreateVersion7(),
+                    Id = itemId,
                     WorkspaceId = workspace.Id,
                     ExtractionRunId = run.Id,
                     Title = Clip(ap.Title, 300)!,
@@ -178,6 +184,27 @@ public sealed class ExtractionRunner(
                     }).ToList(),
                 });
             }
+
+            // Possible duplicates: the model's loose groups plus a whole-document title check. Flags only; nothing is merged here.
+            var flags = new Dictionary<(Guid, Guid), DuplicateSource>();
+            void Flag(Guid x, Guid y, DuplicateSource source)
+            {
+                if (x == y) return;
+                var key = x.CompareTo(y) < 0 ? (x, y) : (y, x);
+                if (!flags.ContainsKey(key) || source == DuplicateSource.Ai) flags[key] = source;
+            }
+            foreach (var (a, b) in aiPossible) Flag(itemIds[a], itemIds[b], DuplicateSource.Ai);
+            foreach (var (a, b) in ActionPointDeduplicator.SimilarPairs(merged)) Flag(itemIds[merged[a]], itemIds[merged[b]], DuplicateSource.Similarity);
+            db.Set<ActionItemLink>().AddRange(flags.Select(f => new ActionItemLink
+            {
+                Id = Guid.CreateVersion7(),
+                WorkspaceId = workspace.Id,
+                ActionItemAId = f.Key.Item1,
+                ActionItemBId = f.Key.Item2,
+                Source = f.Value,
+                CreatedAt = now,
+            }));
+            logger.LogInformation("Run {RunId}: flagged {Count} possible duplicate pair(s).", runId, flags.Count);
 
             run.Model = model;
             run.FinishReason = finishReason;

@@ -48,6 +48,9 @@ namespace DistillForge.Data.Migrations
                     b.Property<bool>("IsManual")
                         .HasColumnType("boolean");
 
+                    b.Property<Guid?>("MergedIntoId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Owner")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -70,9 +73,49 @@ namespace DistillForge.Data.Migrations
 
                     b.HasIndex("CategoryId");
 
+                    b.HasIndex("MergedIntoId");
+
                     b.HasIndex("WorkspaceId", "CategoryId");
 
                     b.ToTable("ActionItems");
+                });
+
+            modelBuilder.Entity("DistillForge.Data.Entities.ActionItemLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActionItemAId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActionItemBId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Dismissed")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActionItemBId");
+
+                    b.HasIndex("WorkspaceId");
+
+                    b.HasIndex("ActionItemAId", "ActionItemBId")
+                        .IsUnique();
+
+                    b.ToTable("ActionItemLinks");
                 });
 
             modelBuilder.Entity("DistillForge.Data.Entities.AiModel", b =>
@@ -365,6 +408,11 @@ namespace DistillForge.Data.Migrations
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("DistillForge.Data.Entities.ActionItem", null)
+                        .WithMany()
+                        .HasForeignKey("MergedIntoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("DistillForge.Data.Entities.Workspace", "Workspace")
                         .WithMany("ActionItems")
                         .HasForeignKey("WorkspaceId")
@@ -374,6 +422,27 @@ namespace DistillForge.Data.Migrations
                     b.Navigation("Category");
 
                     b.Navigation("Workspace");
+                });
+
+            modelBuilder.Entity("DistillForge.Data.Entities.ActionItemLink", b =>
+                {
+                    b.HasOne("DistillForge.Data.Entities.ActionItem", null)
+                        .WithMany()
+                        .HasForeignKey("ActionItemAId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DistillForge.Data.Entities.ActionItem", null)
+                        .WithMany()
+                        .HasForeignKey("ActionItemBId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DistillForge.Data.Entities.Workspace", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("DistillForge.Data.Entities.AiModel", b =>

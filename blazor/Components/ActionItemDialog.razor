@@ -38,6 +38,67 @@
             </div>
         </div>
 
+        @if (Linked.Count > 0)
+        {
+            <div class="dup-section">
+                <span class="field-label">⚠ Possible duplicates</span>
+                @foreach (var o in Linked)
+                {
+                    <div class="dup-card">
+                        <div class="dup-title" title="@o.Summary">@o.Title</div>
+                        <div class="note-meta">
+                            @if (!string.IsNullOrEmpty(o.Owner)) { <span class="chip">@o.Owner</span> }
+                            @if (!string.IsNullOrEmpty(o.Due)) { <span class="chip chip-due">@o.Due</span> }
+                            <span class="chip">@CategoryName(o)</span>
+                        </div>
+                        @if (!ReadOnly)
+                        {
+                            <div class="dup-actions">
+                                <button type="button" class="secondary" disabled="@(IsDirty || Busy)" title="@MergeTip"
+                                        @onclick="() => OnMerge.InvokeAsync((o.Id, Item.Id))">Merge it into this note</button>
+                                <button type="button" class="secondary" disabled="@(IsDirty || Busy)" title="@MergeTip"
+                                        @onclick="() => OnMerge.InvokeAsync((Item.Id, o.Id))">Merge this into it</button>
+                                <button type="button" class="link" disabled="@Busy" @onclick="() => OnNotDuplicate.InvokeAsync(o.Id)">Not a duplicate</button>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (IsDirty && !ReadOnly) { <span class="muted small">Save or reset your edits to enable merging.</span> }
+            </div>
+        }
+
+        @if (Merged.Count > 0)
+        {
+            <div class="dup-section">
+                <span class="field-label">Merged into this note (@Merged.Count)</span>
+                @foreach (var m in Merged)
+                {
+                    <div class="dup-card">
+                        <div class="dup-title" title="@m.Summary">@m.Title</div>
+                        @if (m.Evidence.Count > 0)
+                        {
+                            <details class="evidence">
+                                <summary>Its source evidence (@m.Evidence.Count)</summary>
+                                <ul>
+                                    @foreach (var e in m.Evidence)
+                                    {
+                                        <li><span class="chip">@e.SegmentLabel</span> “@e.Quote”</li>
+                                    }
+                                </ul>
+                            </details>
+                        }
+                        @if (!ReadOnly)
+                        {
+                            <div class="dup-actions">
+                                <button type="button" class="secondary" disabled="@(IsDirty || Busy)" title="@MergeTip"
+                                        @onclick="() => OnUnmerge.InvokeAsync(m.Id)">Unmerge</button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
         @if (Item.Evidence.Count > 0)
         {
             <details class="evidence">
@@ -69,6 +130,20 @@
     [Parameter] public string? Error { get; set; }
     [Parameter] public EventCallback<UpdateActionItemRequest> OnSave { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
+    /// <summary>Notes flagged as possible duplicates of this one (already resolved to top-level notes).</summary>
+    [Parameter] public IReadOnlyList<ActionItemDto> Linked { get; set; } = [];
+    /// <summary>Notes merged into this one.</summary>
+    [Parameter] public IReadOnlyList<ActionItemDto> Merged { get; set; } = [];
+    [Parameter] public IReadOnlyList<CategoryDto> Categories { get; set; } = [];
+    /// <summary>(source, target): the source note is merged into the target.</summary>
+    [Parameter] public EventCallback<(Guid Source, Guid Target)> OnMerge { get; set; }
+    [Parameter] public EventCallback<Guid> OnUnmerge { get; set; }
+    [Parameter] public EventCallback<Guid> OnNotDuplicate { get; set; }
+
+    private const string MergeTip = "Merged notes are hidden and follow the note they're merged into. You can unmerge later.";
+
+    private string CategoryName(ActionItemDto o) =>
+        o.CategoryId is Guid id && Categories.FirstOrDefault(c => c.Id == id) is { } c ? c.Name : "Uncategorised";
 
     private string _title = "", _summary = "", _owner = "", _due = "";
     private string? _colour; // null = automatic

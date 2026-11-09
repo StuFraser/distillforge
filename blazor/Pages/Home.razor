@@ -136,6 +136,13 @@
                             <option value="without">No deadline (@_actions.Count(a => !HasDue(a)))</option>
                         </select>
                     </label>
+                    <label>
+                        Duplicates
+                        <select @bind="DupFilter">
+                            <option value="">Any</option>
+                            <option value="only">Possible duplicates (@_actions.Count(IsPossibleDup))</option>
+                        </select>
+                    </label>
                     <span class="swatch-key" title="Notes with a deadline are yellow"><span class="swatch"></span>deadline</span>
                     @if (FiltersActive)
                     {
@@ -148,7 +155,10 @@
                 @foreach (var item in VisibleUncategorised)
                 {
                     <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)"
-                                Draggable="CanEdit" Dragging="_dragId == item.Id" OnDragStart="() => StartDrag(item)" OnDragEnd="EndDrag" />
+                                Draggable="CanEdit" Dragging="_dragId == item.Id" OnDragStart="() => StartDrag(item)" OnDragEnd="EndDrag"
+                                PossibleDuplicate="IsPossibleDup(item)" MergedCount="MergedCountOf(item)"
+                                Droppable="CanDropOn(item)" MergeTarget="_mergeHover == item.Id"
+                                OnDragEnterNote="() => NoteDragEnter(item)" OnDragLeaveNote="() => NoteDragLeave(item)" OnDropNote="() => DropOnNote(item)" />
                 }
                 @if (!IsExtracting && _workspace is not null && _actions.Count == 0)
                 {
@@ -207,7 +217,10 @@
                     @foreach (var item in InActive)
                     {
                         <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)"
-                                    Draggable="CanEdit" Dragging="_dragId == item.Id" OnDragStart="() => StartDrag(item)" OnDragEnd="EndDrag" />
+                                    Draggable="CanEdit" Dragging="_dragId == item.Id" OnDragStart="() => StartDrag(item)" OnDragEnd="EndDrag"
+                                    PossibleDuplicate="IsPossibleDup(item)" MergedCount="MergedCountOf(item)"
+                                    Droppable="CanDropOn(item)" MergeTarget="_mergeHover == item.Id"
+                                    OnDragEnterNote="() => NoteDragEnter(item)" OnDragLeaveNote="() => NoteDragLeave(item)" OnDropNote="() => DropOnNote(item)" />
                     }
                     @if (InActive.Count == 0)
                     {
@@ -227,6 +240,8 @@
 @if (_editing is not null)
 {
     <ActionItemDialog Item="_editing" ReadOnly="_workspace?.IsArchived == true" Busy="_editSaving" Error="@_editError"
+                      Linked="LinkedFor(_editing)" Merged="MergedOf(_editing)" Categories="_categories"
+                      OnMerge="MergeItems" OnUnmerge="UnmergeItem" OnNotDuplicate="DismissDuplicate"
                       OnSave="SaveItem" OnCancel="CloseItem" />
 }
 
@@ -242,7 +257,22 @@
 
 @code {
     private WorkspaceDto? _workspace;
-    private List<ActionItemDto> _actions = [];
+    private List<ActionItemDto> _actions = [];  // top-level notes only (what the panels show)
+    private List<ActionItemDto> _merged = [];   // notes merged into another; hidden, follow their parent
+
+    private void ApplyActions(IEnumerable<ActionItemDto> all)
+    {
+        var list = all.ToList();
+        _actions = list.Where(a => a.MergedIntoId is null).ToList();
+        _merged = list.Where(a => a.MergedIntoId is not null).ToList();
+        if (_selectedId is Guid sel && !_actions.Any(a => a.Id == sel)) ClearSelection();
+    }
+
+    private static bool IsPossibleDup(ActionItemDto a) => a.PossibleDuplicateIds is { Count: > 0 };
+    private int MergedCountOf(ActionItemDto a) => _merged.Count(m => m.MergedIntoId == a.Id);
+    private List<ActionItemDto> MergedOf(ActionItemDto a) => _merged.Where(m => m.MergedIntoId == a.Id).ToList();
+    private List<ActionItemDto> LinkedFor(ActionItemDto a) =>
+        _actions.Where(o => a.PossibleDuplicateIds?.Contains(o.Id) == true).ToList();
     private ExtractionRunDto? _run;
     private Guid? _selectedId;
     private IReadOnlyList<HighlightRange> _highlights = [];
@@ -317,6 +347,8 @@
             _categories.Remove(c);
             for (var i = 0; i < _actions.Count; i++)
                 if (_actions[i].CategoryId == c.Id) _actions[i] = _actions[i] with { CategoryId = null };
+            for (var i = 0; i < _merged.Count; i++)
+                if (_merged[i].CategoryId == c.Id) _merged[i] = _merged[i] with { CategoryId = null };
             if (_activeCategoryId == c.Id) _activeCategoryId = null;
         }
         catch (ApiException ex) { _error = ex.Message; }
@@ -330,7 +362,53 @@
 
     private void StartDrag(ActionItemDto item) { if (CanEdit) _dragId = item.Id; }
 
-    private void EndDrag() { _dragId = null; _dropTarget = null; }
+    private void EndDrag() { _dragId = null; _dropTarget = null; _mergeHover = null; }
+
+    // ---- Merging (drop a note onto another) ----
+    private Guid? _mergeHover;
+
+    private bool CanDropOn(ActionItemDto target) => CanEdit && _dragId is Guid d && d != target.Id;
+
+    private void NoteDragEnter(ActionItemDto target) { if (CanDropOn(target)) _mergeHover = target.Id; }
+
+    private void NoteDragLeave(ActionItemDto target) { if (_mergeHover == target.Id) _mergeHover = null; }
+
+    private async Task DropOnNote(ActionItemDto target)
+    {
+        var id = _dragId;
+        EndDrag(); // the dragged card may vanish after the merge, in which case dragend never fires
+        if (id is null || id == target.Id || !CanEdit) return;
+        var source = _actions.FirstOrDefault(a => a.Id == id);
+        if (source is null) return;
+
+        var carried = MergedCountOf(source);
+        var msg = $"Merge “{source.Title}” into “{target.Title}”?\n\n" +
+                  $"“{source.Title}” will be hidden and follow “{target.Title}”" +
+                  (carried > 0 ? $", along with its {carried} merged note{(carried == 1 ? "" : "s")}" : "") +
+                  $". You can unmerge it later from the details of “{target.Title}”.";
+        if (!await JS.InvokeAsync<bool>("confirm", msg)) return;
+        await NoteOp(() => Api.MergeActionAsync(source.Id, target.Id, _cts.Token));
+    }
+
+    private Task MergeItems((Guid Source, Guid Target) m) => NoteOp(() => Api.MergeActionAsync(m.Source, m.Target, _cts.Token));
+    private Task UnmergeItem(Guid id) => NoteOp(() => Api.UnmergeActionAsync(id, _cts.Token));
+    private Task DismissDuplicate(Guid otherId) =>
+        _editing is null ? Task.CompletedTask : NoteOp(() => Api.DismissDuplicateAsync(_editing.Id, otherId, _cts.Token));
+
+    /// <summary>Runs a merge/unmerge/dismiss call, then refreshes our copy of the notes (and the open dialog, if its note is still visible).</summary>
+    private async Task NoteOp(Func<Task<List<ActionItemDto>>> op)
+    {
+        _editSaving = true;
+        _editError = null;
+        try
+        {
+            ApplyActions(await op());
+            if (_editing is not null) _editing = _actions.FirstOrDefault(a => a.Id == _editing.Id); // null closes it (note was merged away)
+        }
+        catch (ApiException ex) { if (_editing is not null) _editError = ex.Message; else _error = ex.Message; }
+        catch (OperationCanceledException) { }
+        finally { _editSaving = false; }
+    }
 
     private void OnDragOverTarget(string target) { if (_dragId is not null) _dropTarget = target; }
 
@@ -389,11 +467,12 @@
 
     // Filters: "" = no filter. Owner may also be Unassigned.
     private const string Unassigned = "__unassigned__";
-    private string _ownerFilter = "", _dueFilter = "";
+    private string _ownerFilter = "", _dueFilter = "", _dupFilter = "";
 
     private string OwnerFilter { get => _ownerFilter; set { _ownerFilter = value; OnFilterChanged(); } }
     private string DueFilter { get => _dueFilter; set { _dueFilter = value; OnFilterChanged(); } }
-    private bool FiltersActive => _ownerFilter != "" || _dueFilter != "";
+    private string DupFilter { get => _dupFilter; set { _dupFilter = value; OnFilterChanged(); } }
+    private bool FiltersActive => _ownerFilter != "" || _dueFilter != "" || _dupFilter != "";
 
     private static bool HasDue(ActionItemDto a) => !string.IsNullOrWhiteSpace(a.Due);
 
@@ -418,7 +497,8 @@
             "without" => !HasDue(a),
             _ => true,
         };
-        return ownerOk && dueOk;
+        bool dupOk = _dupFilter != "only" || IsPossibleDup(a);
+        return ownerOk && dueOk && dupOk;
     }
 
     private List<ActionItemDto> VisibleUncategorised => _actions.Where(a => a.CategoryId is null && Matches(a)).ToList();
@@ -431,7 +511,7 @@
 
     private void ResetFilters()
     {
-        _ownerFilter = _dueFilter = "";
+        _ownerFilter = _dueFilter = _dupFilter = "";
     }
 
     private string ProgressText =>
@@ -490,7 +570,7 @@
     private async Task LoadWorkspace(Guid id)
     {
         _workspace = await Api.GetWorkspaceAsync(id, _cts.Token);
-        _actions = _workspace is null ? [] : await Api.GetActionsAsync(id, _cts.Token);
+        ApplyActions(_workspace is null ? [] : await Api.GetActionsAsync(id, _cts.Token));
         _run = _workspace is null ? null : await Api.GetLatestRunAsync(id, _cts.Token);
         _categories = _workspace is null ? [] : await Api.GetCategoriesAsync(id, _cts.Token);
         _activeCategoryId = null;
@@ -551,6 +631,7 @@
     {
         _workspace = null;
         _actions = [];
+        _merged = [];
         _categories = [];
         _run = null;
         ClearSelection();
@@ -570,6 +651,7 @@
                 ? await Api.CreateWorkspaceAsync(new CreateWorkspaceRequest(input.Text, null, input.Strategy), _cts.Token)
                 : await Api.ReplaceSourceAsync(_workspace.Id, new ReplaceSourceRequest(input.Text, input.Strategy), _cts.Token);
             _actions = [];
+            _merged = [];
             _categories = _workspace is null ? [] : await Api.GetCategoriesAsync(_workspace.Id, _cts.Token);
             _run = null;
             ClearSelection();
@@ -614,7 +696,7 @@
         }
         if (_run?.Status == ExtractionRunStatus.Succeeded && _workspace is not null)
         {
-            _actions = await Api.GetActionsAsync(_workspace.Id, _cts.Token);
+            ApplyActions(await Api.GetActionsAsync(_workspace.Id, _cts.Token));
             // A re-extract can drop the party being filtered on; don't strand the user on an empty view.
             if (_ownerFilter is not ("" or Unassigned) && !Owners.Any(o => string.Equals(o.Name, _ownerFilter, StringComparison.OrdinalIgnoreCase)))
                 _ownerFilter = "";
@@ -626,7 +708,9 @@
     {
         if (_selectedId == item.Id) { ClearSelection(); return; }
         _selectedId = item.Id;
-        _highlights = item.Evidence.Select(e => new HighlightRange(e.Start, e.End, e.MatchQuality)).ToList();
+        // A note highlights its own passages plus those of every note merged into it.
+        _highlights = item.Evidence.Concat(MergedOf(item).SelectMany(m => m.Evidence))
+            .Select(e => new HighlightRange(e.Start, e.End, e.MatchQuality)).ToList();
         _scrollPending = true;
     }
 
