@@ -3,6 +3,7 @@ using DistillForge.Core.Extraction;
 using DistillForge.Data;
 using DistillForge.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace DistillForge.Api.Services;
@@ -12,11 +13,12 @@ namespace DistillForge.Api.Services;
 /// merge duplicates from overlapping windows (pass 1), then an LLM consolidation pass (pass 2) → persist. Documents that fit the budget are one window.
 /// </summary>
 public sealed class ExtractionRunner(
-    DistillForgeDbContext db, Ai.AiConfigResolver resolver, Ai.ActionExtractorFactory extractors, ILogger<ExtractionRunner> logger)
+    DistillForgeDbContext db, Ai.AiConfigResolver resolver, Ai.ActionExtractorFactory extractors,
+    IServiceScopeFactory scopes, ILogger<ExtractionRunner> logger)
 {
-    public async Task RunAsync(Guid runId, CancellationToken ct)
+    public async Task RunAsync(Guid runId, CancellationToken hostCt)
     {
-        var run = await db.ExtractionRuns.FirstOrDefaultAsync(r => r.Id == runId, ct);
+        var run = await db.ExtractionRuns.FirstOrDefaultAsync(r => r.Id == runId, hostCt);
         if (run is null)
         {
             logger.LogWarning("Extraction run {RunId} not found (workspace replaced?); skipping.", runId);
@@ -28,9 +30,27 @@ public sealed class ExtractionRunner(
             return;
         }
 
-        run.Status = ExtractionRunStatus.Running;
-        run.StartedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
+        // Claim the run atomically: a user cancel that lands between the check above and here must win.
+        var started = DateTimeOffset.UtcNow;
+        var claimed = await db.ExtractionRuns
+            .Where(r => r.Id == runId && r.Status == ExtractionRunStatus.Queued)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.Status, ExtractionRunStatus.Running)
+                .SetProperty(r => r.StartedAt, started), hostCt);
+        if (claimed == 0)
+        {
+            logger.LogInformation("Extraction run {RunId} was cancelled before it started.", runId);
+            return;
+        }
+        await db.Entry(run).ReloadAsync(hostCt);
+
+        // `ct` is cancelled by either the host (timeout / shutdown) or the user (a watcher sees Status = Cancelled).
+        using var userCancel = new CancellationTokenSource();
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(hostCt, userCancel.Token);
+        var ct = linked.Token;
+        using var watcherStop = CancellationTokenSource.CreateLinkedTokenSource(hostCt);
+        var watcher = WatchForCancelAsync(runId, userCancel, watcherStop.Token);
+        var cancelledByUser = false;
 
         try
         {
@@ -167,20 +187,64 @@ public sealed class ExtractionRunner(
             run.Warnings = warnings.Count > 0 ? string.Join('\n', warnings) : null;
             run.Status = ExtractionRunStatus.Succeeded;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (userCancel.IsCancellationRequested && !hostCt.IsCancellationRequested)
+        {
+            // The cancel endpoint already recorded Status = Cancelled. Notes are only written at the very end, so nothing to undo.
+            cancelledByUser = true;
+            logger.LogInformation("Extraction run {RunId} cancelled by the user.", runId);
+        }
+        catch (OperationCanceledException) when (hostCt.IsCancellationRequested)
+        {
+            // Function timeout (host.json functionTimeout) or host shutdown. Without this the run would stay "Running" forever.
+            logger.LogError("Extraction run {RunId} was interrupted by the host (timeout or shutdown) at window {Index}/{Count}.",
+                runId, run.WindowIndex, run.WindowCount);
+            MarkFailed(run, $"Extraction was interrupted (the function timed out or the host shut down){ProgressSuffix(run)}.");
+        }
+        catch (Exception ex)
         {
             // Don't rethrow: a queue retry would repeat an expensive (and likely identical) model call.
             logger.LogError(ex, "Extraction run {RunId} failed.", runId);
-            db.ChangeTracker.Clear();
-            db.Attach(run);
-            run.Status = ExtractionRunStatus.Failed;
-            run.Error = ex is Ai.ExtractionFailedException or HttpRequestException or TaskCanceledException
+            MarkFailed(run, ex is Ai.ExtractionFailedException or HttpRequestException or TaskCanceledException
                 ? ex.Message
-                : $"{ex.GetType().Name}: {ex.Message}";
+                : $"{ex.GetType().Name}: {ex.Message}");
         }
+
+        watcherStop.Cancel();
+        await watcher;
+        if (cancelledByUser) return;
 
         run.CompletedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(CancellationToken.None);
+    }
+
+    private static string ProgressSuffix(ExtractionRun run) =>
+        run.WindowCount is > 0 ? $" at {(run.Phase == ExtractionPhase.Consolidating ? "consolidation" : $"window {run.WindowIndex}/{run.WindowCount}")}" : "";
+
+    private void MarkFailed(ExtractionRun run, string error)
+    {
+        db.ChangeTracker.Clear();
+        db.Attach(run);
+        run.Status = ExtractionRunStatus.Failed;
+        run.Error = error;
+    }
+
+    /// <summary>Polls (on its own DbContext; ours isn't thread-safe) and fires <paramref name="userCancel"/> when the run is marked Cancelled.</summary>
+    private async Task WatchForCancelAsync(Guid runId, CancellationTokenSource userCancel, CancellationToken stop)
+    {
+        try
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), stop);
+                await using var scope = scopes.CreateAsyncScope();
+                var scoped = scope.ServiceProvider.GetRequiredService<DistillForgeDbContext>();
+                var status = await scoped.ExtractionRuns.AsNoTracking()
+                    .Where(r => r.Id == runId).Select(r => r.Status).FirstOrDefaultAsync(stop);
+                if (status == ExtractionRunStatus.Cancelled) { userCancel.Cancel(); return; }
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { logger.LogWarning(ex, "Cancel watcher for run {RunId} stopped; a user cancel will not interrupt this run.", runId); }
     }
 
     /// <summary>Persists live progress so the polling client can show where the run is up to.</summary>

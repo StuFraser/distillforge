@@ -48,6 +48,8 @@ public enum ExtractionRunStatus
     Running,
     Succeeded,
     Failed,
+    /// <summary>Stopped by the user. Existing notes are untouched because notes are only written when a run completes.</summary>
+    Cancelled,
 }
 
 /// <summary>What a running extraction is currently doing. Pass 1 = Extracting (window by window), pass 2 = Consolidating.</summary>

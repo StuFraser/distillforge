@@ -79,6 +79,23 @@ public sealed class ExtractionFunctions(DistillForgeDbContext db, ExtractionRunn
         return run is null ? new NotFoundResult() : new OkObjectResult(run.ToDto());
     }
 
+    /// <summary>Stops a queued or running extraction. Idempotent; a finished run is returned unchanged.</summary>
+    [Function("CancelExtraction")]
+    public async Task<IActionResult> Cancel(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "runs/{id:guid}/cancel")] HttpRequest req,
+        Guid id,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        await db.ExtractionRuns
+            .Where(r => r.Id == id && (r.Status == ExtractionRunStatus.Queued || r.Status == ExtractionRunStatus.Running))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.Status, ExtractionRunStatus.Cancelled)
+                .SetProperty(r => r.CompletedAt, now), ct);
+        var run = await db.ExtractionRuns.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, ct);
+        return run is null ? new NotFoundResult() : new OkObjectResult(run.ToDto());
+    }
+
     [Function("RunExtraction")]
     public Task Run([QueueTrigger(QueueNames.ExtractionRuns)] string runId, CancellationToken ct) =>
         Guid.TryParse(runId, out var id) ? runner.RunAsync(id, ct) : Task.CompletedTask;

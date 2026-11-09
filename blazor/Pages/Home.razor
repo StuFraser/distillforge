@@ -96,6 +96,10 @@
                 {
                     <button type="button" class="status running as-button" @onclick="() => _progressHidden = false" title="Show progress">@ProgressText</button>
                 }
+                else if (_run?.Status == ExtractionRunStatus.Cancelled)
+                {
+                    <span class="status">Extraction cancelled</span>
+                }
                 else if (_run?.Status == ExtractionRunStatus.Failed)
                 {
                     <span class="status failed" title="@_run.Error">Extraction failed: @_run.Error</span>
@@ -217,7 +221,7 @@
 
 @if (IsExtracting && !_progressHidden && _run is not null)
 {
-    <ExtractionProgressDialog Run="_run" OnHide="() => _progressHidden = true" />
+    <ExtractionProgressDialog Run="_run" Cancelling="_cancelling" OnHide="() => _progressHidden = true" OnCancel="CancelExtraction" />
 }
 
 @if (_editing is not null)
@@ -248,7 +252,17 @@
     private string? _error;
     private readonly CancellationTokenSource _cts = new();
 
-    private bool _progressHidden;
+    private bool _progressHidden, _cancelling;
+
+    private async Task CancelExtraction()
+    {
+        if (_run is null || _cancelling) return;
+        _cancelling = true;
+        try { _run = await Api.CancelRunAsync(_run.Id, _cts.Token); }
+        catch (ApiException ex) { _error = ex.Message; }
+        catch (OperationCanceledException) { }
+        finally { _cancelling = false; }
+    }
 
     // ---- Categories ----
     private List<CategoryDto> _categories = [];

@@ -43,7 +43,11 @@
 
         <div class="dialog-actions progress-footer">
             <span class="muted">Elapsed @Elapsed.ToString(@"m\:ss")</span>
-            <button type="button" class="secondary" @onclick="OnHide" title="Keep working; progress stays in the Uncategorised header">Hide</button>
+            <span class="provider-actions">
+                <button type="button" class="secondary" @onclick="OnCancel" disabled="@Cancelling"
+                        title="Stop this extraction. Your existing notes are not changed.">@(Cancelling ? "Cancelling…" : "Cancel extraction")</button>
+                <button type="button" class="secondary" @onclick="OnHide" title="Keep working; progress stays in the Uncategorised header">Hide</button>
+            </span>
         </div>
     </div>
 </div>
@@ -51,6 +55,8 @@
 @code {
     [Parameter, EditorRequired] public ExtractionRunDto Run { get; set; } = default!;
     [Parameter] public EventCallback OnHide { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public bool Cancelling { get; set; }
 
     private readonly DateTime _started = DateTime.UtcNow;
     private readonly CancellationTokenSource _cts = new();

@@ -96,6 +96,10 @@ public sealed class DistillForgeApi(HttpClient http)
         throw await ToException(response, ct);
     }
 
+    public async Task<ExtractionRunDto> CancelRunAsync(Guid runId, CancellationToken ct = default) =>
+        await Send<ExtractionRunDto>(() => http.PostAsync($"runs/{runId}/cancel", null, ct), ct)
+        ?? throw new ApiException("That extraction no longer exists.");
+
     public Task<ExtractionRunDto?> GetRunAsync(Guid runId, CancellationToken ct = default) =>
         Send<ExtractionRunDto>(() => http.GetAsync($"runs/{runId}", ct), ct);
 
