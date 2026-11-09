@@ -62,7 +62,8 @@
                     model's quote couldn't be matched exactly, so the highlight covers the whole passage.</li>
                 <li><strong>⤢</strong> on a note opens it for editing: title, summary, owner, due date and colour. The source evidence is shown read-only.</li>
                 <li><strong>Colours:</strong> by default notes are pink, or yellow when they have a deadline. Choose any colour to override this; choosing the default colour goes back to automatic.</li>
-                <li><strong>Filters</strong> above the Uncategorised notes narrow the list by <em>Party</em> (owner) and <em>Deadline</em>. They only affect the Uncategorised panel.</li>
+                <li><strong>Filters</strong> above the Uncategorised notes narrow the list by <em>Party</em> (owner), <em>Deadline</em> and <em>Duplicates</em> (only notes flagged ⚠ as possible duplicates). They only affect the Uncategorised panel.</li>
+                <li>A <strong>⚠</strong> before a title and a <span class="chip">+2 merged</span> tag mean the note has possible duplicates or other notes merged into it; see <a href="help#duplicates">Duplicates and merging</a>.</li>
             </ul>
         </section>
 
@@ -81,6 +82,11 @@
                     <span class="chip">+1 merged</span> tag, and clicking it highlights the source passages of all of them.</li>
                 <li>Nothing is lost. A merged note keeps its own text and evidence, and <strong>Unmerge</strong> in the parent's details brings it back as a separate note.</li>
             </ul>
+            <p>
+                <strong>Treat the ⚠ as a suggestion.</strong> The flags come from the AI and a simple title comparison, so some point at notes that are only on a related topic.
+                If a flag is wrong, open the note and choose <em>Not a duplicate</em>. A flag can also remain on a note after you merge it with one duplicate, if it was also flagged
+                against a different note; open the note to see which.
+            </p>
             <p class="note-callout">Merging into a note that has already absorbed others keeps everything in one group; a note can only be merged one level deep.
                 Flags appear on notes from a new extraction. Re-extract an older workspace to get them.</p>
         </section>

@@ -12,9 +12,27 @@ tools (email, GitHub Issues, Azure DevOps, Jira, Trello, calendars). It's built 
 business analysts, project consultants and anyone else with long documents full of
 things that need doing.
 
-> **Status:** early development. Milestone 1 (the walking skeleton) is in place:
-> paste text → extract → sticky notes → click to highlight the source.
-> Categories, file upload, sign-in and export are still to come (see [Roadmap](#roadmap)).
+> **Status:** early development, run locally. You can paste a document, extract notes with
+> your own AI model, edit them, sort them into categories by drag and drop, and merge
+> duplicates. Manual notes, file upload, sign-in and export are still to come (see
+> [Roadmap](#roadmap)). The API has no authentication yet, so don't expose it beyond a
+> trusted network.
+
+## What you can do
+
+- **Extract** action points from pasted text. Long documents are split into token-sized
+  windows, extracted window by window, then consolidated. You can cancel a run part-way.
+- **Trace** every note to its source: click a note and its evidence is highlighted.
+- **Edit** notes (title, summary, owner, due date, colour) and filter by party, deadline
+  and possible duplicates.
+- **Categorise** notes: add, rename, recolour and delete categories per workspace, and drag
+  notes between Uncategorised and the categories.
+- **Merge duplicates.** Likely repeats are merged automatically; notes that *might* be the
+  same task are flagged ⚠ for you to review. Merging is non-destructive and can be undone.
+- **Choose the model** for each extraction from the providers you've configured.
+- **Archive** workspaces (read-only) and keep several documents side by side.
+
+There is a built-in **Help** page (the `?` in the top bar) written for end users.
 
 ## Bring your own AI
 
@@ -22,6 +40,18 @@ DistillForge doesn't host a model. It talks to any **OpenAI-compatible
 chat-completions endpoint**, so it works with Ollama, LM Studio, OpenAI, Azure OpenAI,
 OpenRouter and others. It only uses plain chat completions plus `response_format`, with
 no code specific to any one backend.
+
+Providers and models are managed in the app (the ⚙ in the top bar): a provider is an
+endpoint plus optional API key, and each of its models has its own context window,
+reserved output size and structured-output mode. API keys are encrypted at rest and are
+never sent back to the browser. The model for each extraction is picked from a dropdown.
+
+The `AiProvider__*` settings in `api/local.settings.json` are only a **fallback**, used
+when no model has been configured in the app.
+
+**Window size affects quality.** The context window you give a model decides how big each
+extraction window is, and smaller windows often surface more (and more detailed) notes at
+the cost of speed and some near-duplicates. See "Getting better results" in the Help page.
 
 ## How source linking works
 
@@ -53,7 +83,25 @@ LLMs are bad at counting characters, so the model never returns character positi
 
 Extraction runs **asynchronously**. `POST …/extract` returns `202`, a queue-triggered
 function calls the model, and the front end polls the run until it finishes. Calls to a
-local model can easily outlast Azure's roughly 230-second HTTP timeout.
+local model can easily outlast Azure's roughly 230-second HTTP timeout. A run can be
+cancelled (`POST /api/runs/{id}/cancel`). Notes are only written when a run finishes, so
+cancelling or failing never touches existing notes. The queue function is also bound by
+`functionTimeout` in `api/host.json` (10 minutes); a run that exceeds it is marked failed.
+
+## Duplicates and merging
+
+Overlapping windows report some tasks twice, and the same task can be raised more than
+once in a document (a request, then a later confirmation).
+
+- **Automatic:** repeats from the same passage are merged in code, and the model's
+  "exactly the same task" suggestions in the consolidation pass are applied. The model only
+  suggests; code does the merging, so evidence is never rewritten.
+- **Flagged:** the consolidation pass also lists notes that *might* be the same task, and a
+  whole-document title comparison adds more. These show a ⚠ and are never merged
+  automatically.
+- **Manual:** drag a note onto another, or use the buttons in a note's detail view, to merge
+  it into that note. A merged note keeps its own text and evidence, is hidden on the main
+  screen, follows its parent's category, and can be unmerged.
 
 ## Architecture
 
@@ -66,18 +114,18 @@ Blazor WASM  ──HTTP──▶  Azure Functions (isolated)  ──▶  Postgre
 
 | Folder   | Project                    | Purpose |
 |----------|----------------------------|---------|
-| `core/`  | `DistillForge.Core`        | Segmenter, quote resolver, validator, highlight runs, DTOs. Light on dependencies and runs in the browser. |
-| `data/`  | `DistillForge.Data`        | EF Core DbContext, entities, migrations (Npgsql). |
-| `api/`   | `DistillForge.Api`         | Azure Functions (isolated worker): HTTP endpoints, queue trigger, AI client. |
-| `blazor/`| `DistillForge.Blazor`      | Standalone Blazor WebAssembly front end. |
-| `tests/` | `DistillForge.Core.Tests`  | xUnit tests for the core logic. |
+| `core/`  | `DistillForge.Core`        | Segmenter, window planner, quote resolver, validator, de-duplication and merge rules, highlight runs, DTOs and validation. Light on dependencies and runs in the browser. |
+| `data/`  | `DistillForge.Data`        | EF Core DbContext, entities, migrations (Npgsql), API-key encryption. |
+| `api/`   | `DistillForge.Api`         | Azure Functions (isolated worker): HTTP endpoints, queue trigger, extraction runner, AI client. |
+| `blazor/`| `DistillForge.Blazor`      | Standalone Blazor WebAssembly front end, including the Help page. |
+| `tests/` | `DistillForge.Core.Tests`  | xUnit tests for the core logic, validation and key encryption. |
 
 Rules worth knowing:
 - `blazor` holds no secrets. Everything in it can be downloaded by anyone, and it
   reaches data only through the API.
 - `core` must not reference EF Core, Npgsql or Azure SDKs.
-- AI access goes through `IActionExtractor`. Export targets will be separate
-  implementations of one shared interface.
+- AI access goes through `IActionExtractor`, built per run from the chosen model.
+  Export targets will be separate implementations of one shared interface.
 
 ## Getting started
 
@@ -102,20 +150,22 @@ docker compose up -d          # Postgres on :5432, Azurite on :10000-10002
 cp api/local.settings.sample.json api/local.settings.json   # gitignored
 ```
 
-Then edit `api/local.settings.json`:
+Then edit `api/local.settings.json`. You can leave the `AiProvider__*` settings out and
+configure providers in the app instead (⚙ in the top bar).
 
 | Setting | Example | Notes |
 |---------|---------|-------|
 | `ConnectionStrings__Postgres` | `Host=db;Database=distillforge;Username=…;Password=…` | |
 | `AzureWebJobsStorage` | `UseDevelopmentStorage=true` | Azurite |
-| `AiProvider__BaseUrl` | `http://mini.lan:11434/v1` | Include the `/v1` |
-| `AiProvider__Model` | `llama3.1:8b` | |
-| `AiProvider__ApiKey` | `ollama` | Any non-empty value works for Ollama |
-| `AiProvider__ContextTokens` | `8192` | Set it to match the server (e.g. `OLLAMA_CONTEXT_LENGTH`) |
-| `AiProvider__ReserveOutput` | `2048` | Tokens kept free for the model's reply |
-| `AiProvider__SafetyMargin` | `0.1` | |
-| `AiProvider__ResponseFormat` | `JsonSchema` | `JsonObject` or `None` for backends without schema support |
-| `AiProvider__TimeoutSeconds` | `300` | |
+| `Encryption__Key` | *(32 random bytes, base64)* | `openssl rand -base64 32`. Needed to store API keys; back it up, as losing it makes stored keys unreadable |
+| `AiProvider__BaseUrl` | `http://mini.lan:11434/v1` | **Fallback only**, used when no model is configured in the app. Include the `/v1` |
+| `AiProvider__Model` | `llama3.1:8b` | Fallback |
+| `AiProvider__ApiKey` | `ollama` | Fallback. Any non-empty value works for Ollama |
+| `AiProvider__ContextTokens` | `8192` | Fallback. Match the server (e.g. `OLLAMA_CONTEXT_LENGTH`) |
+| `AiProvider__ReserveOutput` | `2048` | Fallback. Tokens kept free for the model's reply |
+| `AiProvider__SafetyMargin` | `0.1` | Used for all models |
+| `AiProvider__ResponseFormat` | `JsonSchema` | Fallback. `JsonObject` or `None` for backends without schema support |
+| `AiProvider__TimeoutSeconds` | `300` | Fallback |
 | `Host.CORS` | `http://localhost:5189,https://localhost:7163` | Blazor dev origins |
 
 ### 3. Create the database
@@ -138,19 +188,19 @@ cd blazor && dotnet watch      # UI on http://localhost:5189
 
 The front end finds the API through `blazor/wwwroot/appsettings.json` (`ApiBaseUrl`).
 
-## API (milestone 1)
+## API
 
-Endpoints are anonymous until Entra ID sign-in is added.
+Endpoints are anonymous until Entra ID sign-in is added, so run it on a trusted network only.
+Everything is under `/api`.
 
-| Method | Route | Description |
-|--------|-------|-------------|
-| `GET`  | `/api/workspaces` | List active workspaces |
-| `POST` | `/api/workspaces` | Create from `{ sourceText, title?, strategy? }` |
-| `GET`  | `/api/workspaces/{id}` | Source text and segments |
-| `PUT`  | `/api/workspaces/{id}/source` | Replace the source; **wipes** notes, categories and runs |
-| `POST` | `/api/workspaces/{id}/extract` | Queue an extraction (`202`, or `409` if one is already running) |
-| `GET`  | `/api/runs/{id}` | Run status, token usage, warnings and error |
-| `GET`  | `/api/workspaces/{id}/actions` | Action items with resolved evidence spans |
+| Area | Routes |
+|------|--------|
+| Workspaces | `GET/POST workspaces`, `GET workspaces/{id}`, `PUT workspaces/{id}/source` (**wipes** notes, categories and runs), `POST workspaces/{id}/archive`, `POST workspaces/{id}/unarchive` |
+| Extraction | `POST workspaces/{id}/extract` (`202`, or `409` if one is running; optional `{ aiModelId }`), `GET workspaces/{id}/runs`, `GET runs/{id}`, `POST runs/{id}/cancel` |
+| Notes | `GET workspaces/{id}/actions` (includes merged notes), `PUT actions/{id}`, `PUT actions/{id}/category` |
+| Merging | `POST actions/{id}/merge` `{ targetId }`, `POST actions/{id}/unmerge`, `POST actions/{id}/not-duplicate` `{ otherId }` |
+| Categories | `GET/POST workspaces/{id}/categories`, `PUT/DELETE categories/{id}` |
+| AI providers | `GET/POST ai/providers`, `PUT/DELETE ai/providers/{id}`, `POST ai/providers/{id}/models`, `PUT/DELETE ai/models/{id}`, `GET ai/models`, `POST ai/discover` (lists an endpoint's models; also "test connection") |
 
 ## Development
 
@@ -166,14 +216,18 @@ when tuning prompts and checking how faithfully quotes are copied.
 ## Roadmap
 
 1. ✅ **Walking skeleton:** paste, segment, single-window extraction, notes, highlighting
-2. Large documents: token-budgeted windows with overlap, de-duplication in code plus a
-   model consolidation pass, fuzzy quote matching, a model comparison harness
-3. Categories (colours, context menu, arrange by source order), manual notes
+2. ✅ (mostly) **Large documents:** token-budgeted windows with overlap, de-duplication in
+   code plus a model consolidation pass, cancel and timeout handling. Still to do: fuzzy
+   quote matching, a model comparison harness
+3. **Categories** ✅ (add/rename/delete, drag and drop), **bring-your-own AI settings** ✅,
+   **duplicate flags and merging** ✅, in-app **Help** ✅. Still to do: manual notes and
+   deleting notes
 4. File upload: txt, md, PDF (text only, no OCR), docx
-5. Entra ID sign-in, and per-user AI provider settings with encrypted API keys
+5. Entra ID sign-in (API security), per-user data and AI provider settings
 6. Export per category: GitHub Issues first, then DevOps, Jira, email and others
 7. Deployment: Azure Functions + Azure Database for PostgreSQL; front end on GitHub
-   Pages or Azure Static Web Apps
+   Pages or Azure Static Web Apps. Note Azure's Consumption plan caps `functionTimeout`
+   at 10 minutes, so very long runs may need one queue message per window
 
 ## License
 
