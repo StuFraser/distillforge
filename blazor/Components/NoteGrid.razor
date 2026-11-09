@@ -1,0 +1,61 @@
+@* A grid of sticky notes (used by both the Uncategorised and the category panels).
+   Presentation only: it holds no drag or selection state and never calls the API. The parent owns that state and passes it in,
+   because the drag state is shared with the category tabs and the merge logic. *@
+<div class="notes-grid @CssClass"
+     @oncontextmenu="OnContextMenuAsync" @oncontextmenu:preventDefault="CanEdit"
+     @ondragover="OnDragOverGrid" @ondragover:preventDefault="PreventDragOverDefault"
+     @ondragleave="OnDragLeaveGrid"
+     @ondrop="OnDropOnGrid" @ondrop:preventDefault="PreventDropDefault">
+    @foreach (var item in Notes)
+    {
+        <StickyNote Item="item" Selected="item.Id == SelectedId" OnClick="() => OnSelect.InvokeAsync(item)" OnZoom="() => OnOpen.InvokeAsync(item)"
+                    OnContextMenu="e => OnNoteMenu.InvokeAsync((item, e))"
+                    Draggable="CanEdit" Dragging="DragId == item.Id" OnDragStart="() => OnDragStart.InvokeAsync(item)" OnDragEnd="OnDragEnd"
+                    PossibleDuplicate="item.PossibleDuplicateIds is { Count: > 0 }" MergedCount="MergedCountOf(item)"
+                    Droppable="CanDropOn(item)" MergeTarget="MergeHoverId == item.Id"
+                    OnDragEnterNote="() => OnDragEnterNote.InvokeAsync(item)" OnDragLeaveNote="() => OnDragLeaveNote.InvokeAsync(item)"
+                    OnDropNote="() => OnDropNote.InvokeAsync(item)" />
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ActionItemDto> Notes { get; set; } = [];
+    /// <summary>Extra class on the grid element (e.g. <c>category-body</c>).</summary>
+    [Parameter] public string? CssClass { get; set; }
+    /// <summary>Notes can be dragged, and right-click opens the "add" menu. False when the workspace is archived or extracting.</summary>
+    [Parameter] public bool CanEdit { get; set; }
+    [Parameter] public Guid? SelectedId { get; set; }
+    [Parameter] public Guid? DragId { get; set; }
+    [Parameter] public Guid? MergeHoverId { get; set; }
+
+    /// <summary>How many notes are merged into the given one (shown as a chip).</summary>
+    [Parameter] public Func<ActionItemDto, int> MergedCountOf { get; set; } = _ => 0;
+    /// <summary>Whether the dragged note can be dropped onto this note (to merge).</summary>
+    [Parameter] public Func<ActionItemDto, bool> CanDropOn { get; set; } = _ => false;
+
+    [Parameter] public EventCallback<ActionItemDto> OnSelect { get; set; }
+    [Parameter] public EventCallback<ActionItemDto> OnOpen { get; set; }
+    [Parameter] public EventCallback<(ActionItemDto Item, MouseEventArgs Args)> OnNoteMenu { get; set; }
+    /// <summary>Right-click on empty space in the grid.</summary>
+    [Parameter] public EventCallback<MouseEventArgs> OnPaneMenu { get; set; }
+
+    [Parameter] public EventCallback<ActionItemDto> OnDragStart { get; set; }
+    [Parameter] public EventCallback OnDragEnd { get; set; }
+    [Parameter] public EventCallback<ActionItemDto> OnDragEnterNote { get; set; }
+    [Parameter] public EventCallback<ActionItemDto> OnDragLeaveNote { get; set; }
+    [Parameter] public EventCallback<ActionItemDto> OnDropNote { get; set; }
+
+    /// <summary>The grid itself as a drop target (the category panel); leave unbound for a grid that isn't one.</summary>
+    [Parameter] public EventCallback OnDragOverGrid { get; set; }
+    [Parameter] public EventCallback OnDragLeaveGrid { get; set; }
+    [Parameter] public EventCallback OnDropOnGrid { get; set; }
+    /// <summary>Cancels the browser's default for dragover, which is what allows a drop here.</summary>
+    [Parameter] public bool PreventDragOverDefault { get; set; }
+    [Parameter] public bool PreventDropDefault { get; set; }
+
+    /// <summary>Empty-state messages and the like, rendered after the notes.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private Task OnContextMenuAsync(MouseEventArgs e) => CanEdit ? OnPaneMenu.InvokeAsync(e) : Task.CompletedTask;
+}

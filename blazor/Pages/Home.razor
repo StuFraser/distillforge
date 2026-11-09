@@ -152,15 +152,10 @@
                     <span class="muted filter-count">Showing @VisibleUncategorised.Count of @_actions.Count(a => a.CategoryId is null)</span>
                 </div>
             }
-            <div class="notes-grid" @oncontextmenu="e => ShowPaneMenu(null, e)" @oncontextmenu:preventDefault="CanEdit">
-                @foreach (var item in VisibleUncategorised)
-                {
-                    <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)" OnContextMenu="e => ShowNoteMenu(item, e)"
-                                Draggable="CanEdit" Dragging="_dragId == item.Id" OnDragStart="() => StartDrag(item)" OnDragEnd="EndDrag"
-                                PossibleDuplicate="IsPossibleDup(item)" MergedCount="MergedCountOf(item)"
-                                Droppable="CanDropOn(item)" MergeTarget="_mergeHover == item.Id"
-                                OnDragEnterNote="() => NoteDragEnter(item)" OnDragLeaveNote="() => NoteDragLeave(item)" OnDropNote="() => DropOnNote(item)" />
-                }
+            <NoteGrid Notes="VisibleUncategorised" CanEdit="CanEdit" SelectedId="_selectedId" DragId="_dragId" MergeHoverId="_mergeHover"
+                      MergedCountOf="MergedCountOf" CanDropOn="CanDropOn"
+                      OnSelect="Select" OnOpen="OpenItem" OnNoteMenu="m => ShowNoteMenu(m.Item, m.Args)" OnPaneMenu="e => ShowPaneMenu(null, e)"
+                      OnDragStart="StartDrag" OnDragEnd="EndDrag" OnDragEnterNote="NoteDragEnter" OnDragLeaveNote="NoteDragLeave" OnDropNote="DropOnNote">
                 @if (!IsExtracting && _workspace is not null && _actions.Count == 0)
                 {
                     <p class="muted">No action items yet.</p>
@@ -169,7 +164,7 @@
                 {
                     <p class="muted">No notes match the current filters.</p>
                 }
-            </div>
+            </NoteGrid>
         </section>
 
         <section class="panel categories-panel @(_dropTarget == BodyTarget ? "drop-over" : "")" aria-label="Categories">
@@ -205,30 +200,22 @@
                     }
                 }
             </nav>
-            <div class="notes-grid category-body" @oncontextmenu="e => ShowPaneMenu(ActiveCategory?.Id, e)" @oncontextmenu:preventDefault="CanEdit"
-                 @ondragover="() => OnDragOverTarget(BodyTarget)" @ondragover:preventDefault="@(_dragId is not null && ActiveCategory is not null)"
-                 @ondragleave="() => ClearDropTarget(BodyTarget)"
-                 @ondrop="() => DropOn(ActiveCategory?.Id)" @ondrop:preventDefault="true">
+            <NoteGrid Notes="InActive" CssClass="category-body" CanEdit="CanEdit" SelectedId="_selectedId" DragId="_dragId" MergeHoverId="_mergeHover"
+                      MergedCountOf="MergedCountOf" CanDropOn="CanDropOn"
+                      OnSelect="Select" OnOpen="OpenItem" OnNoteMenu="m => ShowNoteMenu(m.Item, m.Args)" OnPaneMenu="e => ShowPaneMenu(ActiveCategory?.Id, e)"
+                      OnDragStart="StartDrag" OnDragEnd="EndDrag" OnDragEnterNote="NoteDragEnter" OnDragLeaveNote="NoteDragLeave" OnDropNote="DropOnNote"
+                      OnDragOverGrid="() => OnDragOverTarget(BodyTarget)" PreventDragOverDefault="@(_dragId is not null && ActiveCategory is not null)"
+                      OnDragLeaveGrid="() => ClearDropTarget(BodyTarget)"
+                      OnDropOnGrid="() => DropOn(ActiveCategory?.Id)" PreventDropDefault="true">
                 @if (ActiveCategory is null)
                 {
                     <p class="muted empty-hint">@(_workspace is null ? "Open a workspace to add categories." : "Add a category with ＋, then drag notes onto it.")</p>
                 }
-                else
+                else if (InActive.Count == 0)
                 {
-                    @foreach (var item in InActive)
-                    {
-                        <StickyNote Item="item" Selected="item.Id == _selectedId" OnClick="() => Select(item)" OnZoom="() => OpenItem(item)" OnContextMenu="e => ShowNoteMenu(item, e)"
-                                    Draggable="CanEdit" Dragging="_dragId == item.Id" OnDragStart="() => StartDrag(item)" OnDragEnd="EndDrag"
-                                    PossibleDuplicate="IsPossibleDup(item)" MergedCount="MergedCountOf(item)"
-                                    Droppable="CanDropOn(item)" MergeTarget="_mergeHover == item.Id"
-                                    OnDragEnterNote="() => NoteDragEnter(item)" OnDragLeaveNote="() => NoteDragLeave(item)" OnDropNote="() => DropOnNote(item)" />
-                    }
-                    @if (InActive.Count == 0)
-                    {
-                        <p class="muted empty-hint">Drag notes here to put them in “@ActiveCategory.Name”.</p>
-                    }
+                    <p class="muted empty-hint">Drag notes here to put them in “@ActiveCategory.Name”.</p>
                 }
-            </div>
+            </NoteGrid>
         </section>
     </div>
 </div>
