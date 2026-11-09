@@ -15,3 +15,6 @@ __azurite_db_*.json
 __blobstorage__/
 __queuestorage__/
 .azurite/
+
+# Marketing notes (private)
+marketing/
