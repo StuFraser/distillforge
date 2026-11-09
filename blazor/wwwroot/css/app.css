@@ -313,3 +313,10 @@ a.icon-button { display: inline-flex; align-items: center; justify-content: cent
 .dup-title { font-weight: 600; font-size: 0.9rem; }
 .dup-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .item-dialog .dup-actions button.secondary { font-size: 0.8rem; padding: 4px 10px; }
+
+/* Confirm / alert dialogs (DialogHost) */
+.dialog-confirm-backdrop { z-index: 30; }
+.confirm-dialog { width: min(440px, calc(100vw - 32px)); outline: none; }
+.dialog-message { margin: 0; white-space: pre-line; line-height: 1.5; color: #374151; overflow-wrap: anywhere; }
+button.primary.danger { background: var(--danger); }
+button.primary:disabled, button.secondary:disabled { opacity: 0.55; cursor: not-allowed; }

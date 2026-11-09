@@ -1,4 +1,5 @@
 @inject DistillForgeApi Api
+@inject DialogService Dialogs
 @implements IDisposable
 
 <div class="dialog-backdrop" @onclick="Close">
@@ -314,7 +315,7 @@
 
     private async Task DeleteProvider(AiProviderDto p)
     {
-        if (!await Confirm($"Delete provider “{p.Name}” and its {p.Models.Count} model(s)? Past extractions keep their results.")) return;
+        if (!await Dialogs.ConfirmAsync("Delete provider", $"Delete “{p.Name}” and its {p.Models.Count} model{(p.Models.Count == 1 ? "" : "s")}?\n\nPast extractions keep their results.", "Delete", danger: true)) return;
         await Run(async () => { await Api.DeleteAiProviderAsync(p.Id, _cts.Token); await Reload(); });
     }
 
@@ -371,7 +372,7 @@
 
     private async Task DeleteModel(AiModelDto m)
     {
-        if (!await Confirm($"Delete model “{m.DisplayName ?? m.ModelId}”?")) return;
+        if (!await Dialogs.ConfirmAsync("Delete model", $"Delete the model “{m.DisplayName ?? m.ModelId}”?", "Delete", danger: true)) return;
         await Run(async () => { await Api.DeleteAiModelAsync(m.Id, _cts.Token); await Reload(); });
     }
 
@@ -381,9 +382,6 @@
         try { await action(); }
         catch (ApiException ex) { _error = ex.Message; }
     }
-
-    [Inject] private IJSRuntime JS { get; set; } = default!;
-    private async Task<bool> Confirm(string message) => await JS.InvokeAsync<bool>("confirm", message);
 
     public void Dispose() { _cts.Cancel(); _cts.Dispose(); }
 }

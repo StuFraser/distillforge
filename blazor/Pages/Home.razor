@@ -3,6 +3,7 @@
 @inject DistillForgeApi Api
 @inject IJSRuntime JS
 @inject AiSettingsState AiState
+@inject DialogService Dialogs
 
 <PageTitle>DistillForge</PageTitle>
 
@@ -339,8 +340,8 @@
     private async Task DeleteCategory(CategoryDto c)
     {
         var n = CountIn(c);
-        var msg = n == 0 ? $"Delete category “{c.Name}”?" : $"Delete category “{c.Name}”? Its {n} note{(n == 1 ? "" : "s")} will return to Uncategorised.";
-        if (!await JS.InvokeAsync<bool>("confirm", msg)) return;
+        var msg = n == 0 ? $"Delete the category “{c.Name}”?" : $"Delete the category “{c.Name}”?\n\nIts {n} note{(n == 1 ? "" : "s")} will return to Uncategorised.";
+        if (!await Dialogs.ConfirmAsync("Delete category", msg, "Delete", danger: true)) return;
         try
         {
             await Api.DeleteCategoryAsync(c.Id, _cts.Token);
@@ -382,11 +383,10 @@
         if (source is null) return;
 
         var carried = MergedCountOf(source);
-        var msg = $"Merge “{source.Title}” into “{target.Title}”?\n\n" +
-                  $"“{source.Title}” will be hidden and follow “{target.Title}”" +
+        var msg = $"“{source.Title}” will be hidden and follow “{target.Title}”" +
                   (carried > 0 ? $", along with its {carried} merged note{(carried == 1 ? "" : "s")}" : "") +
-                  $". You can unmerge it later from the details of “{target.Title}”.";
-        if (!await JS.InvokeAsync<bool>("confirm", msg)) return;
+                  $".\n\nYou can unmerge it later from the details of “{target.Title}”.";
+        if (!await Dialogs.ConfirmAsync("Merge notes?", msg, "Merge")) return;
         await NoteOp(() => Api.MergeActionAsync(source.Id, target.Id, _cts.Token));
     }
 
@@ -667,7 +667,9 @@
     private async Task ConfirmReextract()
     {
         if (_actions.Any(a => !a.IsManual) &&
-            !await JS.InvokeAsync<bool>("confirm", "Re-extracting replaces all extracted notes, including any edits you've made to them. Continue?"))
+            !await Dialogs.ConfirmAsync("Re-extract this document?",
+                "Re-extracting replaces all extracted notes, including any edits you've made to them and any you've moved into categories.\n\nCategories themselves are kept.",
+                "Re-extract", danger: true))
             return;
         await StartExtraction();
     }

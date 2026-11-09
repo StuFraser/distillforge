@@ -1,0 +1,63 @@
+@inject DialogService Dialogs
+@implements IDisposable
+
+@if (Dialogs.Current is { } d)
+{
+    <div class="dialog-backdrop dialog-confirm-backdrop" @onclick="Dismiss">
+        <div class="dialog confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message"
+             tabindex="-1" @onclick:stopPropagation="true" @onkeydown="OnKeyDown">
+            <h2 id="confirm-title">@d.Title</h2>
+            <p id="confirm-message" class="dialog-message">@d.Message</p>
+            <div class="dialog-actions">
+                @foreach (var b in d.Buttons)
+                {
+                    if (b.IsDefault)
+                    {
+                        <button type="button" class="@ClassFor(b)" @ref="_defaultButton" @onclick="() => Dialogs.Complete(b.Value)">@b.Label</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="@ClassFor(b)" @onclick="() => Dialogs.Complete(b.Value)">@b.Label</button>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private ElementReference _defaultButton;
+    private DialogOptions? _focused;
+
+    protected override void OnInitialized() => Dialogs.Changed += OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    // Focus the default button once per dialog so Enter/Space and Escape work straight away.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var current = Dialogs.Current;
+        if (current is null) { _focused = null; return; }
+        if (ReferenceEquals(current, _focused)) return;
+        _focused = current;
+        try { await _defaultButton.FocusAsync(); } catch (InvalidOperationException) { }
+    }
+
+    private static string ClassFor(DialogButton b) => b.Style switch
+    {
+        DialogStyle.Primary => "primary",
+        DialogStyle.Danger => "primary danger",
+        _ => "secondary",
+    };
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") Dismiss();
+    }
+
+    // Escape and clicking outside both choose the cancel button, if there is one.
+    private void Dismiss() =>
+        Dialogs.Complete(Dialogs.Current?.Buttons.FirstOrDefault(b => b.IsCancel)?.Value);
+
+    public void Dispose() => Dialogs.Changed -= OnChanged;
+}
