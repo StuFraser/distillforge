@@ -9,8 +9,33 @@ using Microsoft.EntityFrameworkCore;
 namespace DistillForge.Api.Functions;
 
 // AuthorizationLevel.Anonymous until Entra ID is wired up (milestone 5).
-public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceService workspaces)
+public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceService workspaces, SourceFileExtractor sourceFiles)
 {
+    [Function("ExtractSourceFile")]
+    public async Task<IActionResult> ExtractSourceFile(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "sources/extract")] HttpRequest req,
+        CancellationToken ct)
+    {
+        if (!req.HasFormContentType) return new BadRequestObjectResult("Expected a multipart form with a file.");
+        var form = await req.ReadFormAsync(ct);
+        var file = form.Files.GetFile("file");
+        if (file is null || file.Length == 0) return new BadRequestObjectResult("Choose a non-empty file.");
+        if (file.Length > SourceFileExtractor.MaxUploadBytes)
+            return new BadRequestObjectResult("That file is too large. The upload limit is 10 MB.");
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            var text = await sourceFiles.ExtractAsync(stream, file.FileName, ct);
+            if (string.IsNullOrWhiteSpace(text)) return new BadRequestObjectResult("No text could be extracted from that file.");
+            return new OkObjectResult(new ExtractSourceTextResponse(file.FileName, text));
+        }
+        catch (SourceFileException ex)
+        {
+            return new BadRequestObjectResult(ex.Message);
+        }
+    }
+
     [Function("ListWorkspaces")]
     public async Task<IActionResult> List(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "workspaces")] HttpRequest req,

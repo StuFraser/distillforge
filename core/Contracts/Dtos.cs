@@ -8,6 +8,9 @@ public sealed record CreateWorkspaceRequest(string SourceText, string? Title = n
 
 public sealed record ReplaceSourceRequest(string SourceText, SegmentationStrategyKind? Strategy = null);
 
+/// <summary>Canonical source text produced by the document-import endpoint.</summary>
+public sealed record ExtractSourceTextResponse(string FileName, string Text);
+
 public sealed record WorkspaceSummaryDto(
     Guid Id,
     string Title,

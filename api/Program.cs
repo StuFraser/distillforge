@@ -23,6 +23,7 @@ builder.Services.AddScoped<AiConfigResolver>();
 builder.Services.AddSingleton<ActionExtractorFactory>();
 
 builder.Services.AddScoped<WorkspaceService>();
+builder.Services.AddSingleton<SourceFileExtractor>();
 builder.Services.AddScoped<ExtractionRunner>();
 
 builder.Build().Run();

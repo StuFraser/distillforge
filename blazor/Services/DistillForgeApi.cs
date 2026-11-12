@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
+using Microsoft.AspNetCore.Components.Forms;
 using DistillForge.Core.Contracts;
 
 namespace DistillForge.Blazor.Services;
@@ -26,6 +28,16 @@ public sealed class DistillForgeApi(HttpClient http)
 
     public async Task<WorkspaceDto> ReplaceSourceAsync(Guid id, ReplaceSourceRequest request, CancellationToken ct = default) =>
         (await Send<WorkspaceDto>(() => http.PutAsJsonAsync($"workspaces/{id}/source", request, ct), ct))!;
+
+    public async Task<ExtractSourceTextResponse> ExtractSourceFileAsync(IBrowserFile file, CancellationToken ct = default)
+    {
+        using var content = new MultipartFormDataContent();
+        var stream = file.OpenReadStream(10_000_000, ct);
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse(string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+        content.Add(fileContent, "file", file.Name);
+        return (await Send<ExtractSourceTextResponse>(() => http.PostAsync("sources/extract", content, ct), ct))!;
+    }
 
     public async Task<List<ActionItemDto>> GetActionsAsync(Guid workspaceId, CancellationToken ct = default) =>
         await Send<List<ActionItemDto>>(() => http.GetAsync($"workspaces/{workspaceId}/actions", ct), ct) ?? [];

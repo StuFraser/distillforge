@@ -58,3 +58,34 @@ window.distillforge.watchSelection = function (containerId, dotnetRef) {
     container.removeEventListener('scroll', onScroll);
   } };
 };
+
+// Blazor's InputFile covers the file picker. This companion gives it dropped files
+// so all file types follow the same API upload path.
+window.distillforge.watchFileDrop = function (element) {
+  if (!element) return null;
+  const prevent = function (e) { e.preventDefault(); e.stopPropagation(); };
+  const enter = function (e) { prevent(e); element.classList.add('drag-over'); };
+  const leave = function (e) { prevent(e); if (!element.contains(e.relatedTarget)) element.classList.remove('drag-over'); };
+  const drop = function (e) {
+    prevent(e);
+    element.classList.remove('drag-over');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file) return;
+    const input = element.querySelector('input[type=file]');
+    if (!input) return;
+    const files = new DataTransfer();
+    files.items.add(file);
+    input.files = files.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  element.addEventListener('dragenter', enter);
+  element.addEventListener('dragover', enter);
+  element.addEventListener('dragleave', leave);
+  element.addEventListener('drop', drop);
+  return { dispose: function () {
+    element.removeEventListener('dragenter', enter);
+    element.removeEventListener('dragover', enter);
+    element.removeEventListener('dragleave', leave);
+    element.removeEventListener('drop', drop);
+  } };
+};

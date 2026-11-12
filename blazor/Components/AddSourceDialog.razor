@@ -1,3 +1,8 @@
+@using Microsoft.AspNetCore.Components.Forms
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject DistillForgeApi Api
+
 <div class="dialog-backdrop" @onclick="Cancel">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="add-source-title" @onclick:stopPropagation="true">
         <h2 id="add-source-title">@(IsReplace ? "Replace source" : "Add source")</h2>
@@ -12,6 +17,16 @@
 
         <label for="source-input">Paste text</label>
         <textarea id="source-input" rows="16" @bind="_text" @bind:event="oninput" placeholder="Paste a meeting transcript, plan, contract…"></textarea>
+
+        <div class="source-upload" @ref="_dropZone">
+            <InputFile id="source-file" class="visually-hidden" OnChange="OnFileSelected" accept=".txt,.md,.markdown,.docx,.pdf,.doc" />
+            <label for="source-file" class="secondary upload-button">Choose a document</label>
+            <span class="muted">or drag one here@(!string.IsNullOrEmpty(_fileName) ? $" · {_fileName}" : "")</span>
+            @if (!string.IsNullOrEmpty(_fileError))
+            {
+                <span class="upload-error" role="alert">@_fileError</span>
+            }
+        </div>
 
         <div class="dialog-row">
             <label for="strategy">Document type</label>
@@ -54,8 +69,56 @@
     private string _text = "";
     private string _strategy = "";
     private string _model = "";
+    private string? _fileName;
+    private string? _fileError;
+    private ElementReference _dropZone;
+    private IJSObjectReference? _dropWatcher;
 
     protected override void OnInitialized() => _model = ModelId?.ToString() ?? "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _dropWatcher = await JS.InvokeAsync<IJSObjectReference>("distillforge.watchFileDrop", _dropZone);
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs args)
+    {
+        await ReadFileAsync(args.File);
+    }
+
+    private async Task ReadFileAsync(IBrowserFile file)
+    {
+        if (!IsSupportedFile(file.Name))
+        {
+            _fileName = file.Name;
+            _fileError = "Choose a .txt, .md, .docx or text-based .pdf file.";
+            return;
+        }
+        try
+        {
+            _fileName = file.Name;
+            _fileError = null;
+            var source = await Api.ExtractSourceFileAsync(file);
+            await SetTextAsync(source.FileName, source.Text);
+        }
+        catch (ApiException ex)
+        {
+            _fileName = file.Name;
+            _fileError = ex.Message;
+        }
+    }
+
+    private Task SetTextAsync(string fileName, string text)
+    {
+        _fileName = fileName;
+        _fileError = string.IsNullOrWhiteSpace(text) ? "That file is empty." : null;
+        if (_fileError is null) _text = text;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private static bool IsSupportedFile(string name) =>
+        Path.GetExtension(name).ToLowerInvariant() is ".txt" or ".md" or ".markdown" or ".docx" or ".pdf";
 
     private Task Submit()
     {
@@ -64,4 +127,10 @@
     }
 
     private Task Cancel() => Busy ? Task.CompletedTask : OnCancel.InvokeAsync();
+
+    public async ValueTask DisposeAsync()
+    {
+        try { if (_dropWatcher is not null) { await _dropWatcher.InvokeVoidAsync("dispose"); await _dropWatcher.DisposeAsync(); } }
+        catch (JSDisconnectedException) { }
+    }
 }
