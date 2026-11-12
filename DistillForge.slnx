@@ -15,6 +15,7 @@
     <Project Path="tools/DistillForge.Bench/DistillForge.Bench.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DistillForge.Api.Tests/DistillForge.Api.Tests.csproj" />
     <Project Path="tests/DistillForge.Core.Tests/DistillForge.Core.Tests.csproj" />
   </Folder>
 </Solution>
