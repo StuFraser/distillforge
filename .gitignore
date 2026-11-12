@@ -18,3 +18,7 @@ __queuestorage__/
 
 # Marketing notes (private)
 marketing/
+
+# Benchmark harness: local config (may hold keys) and results
+tools/DistillForge.Bench/bench.json
+bench-results/

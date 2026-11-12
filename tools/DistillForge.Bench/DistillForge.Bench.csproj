@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DistillForge.Bench</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Align with the data project; otherwise the API project's transitive 10.0.4 wins and warns. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.14" />
+    <ProjectReference Include="..\..\api\DistillForge.Api.csproj" />
+    <ProjectReference Include="..\..\core\DistillForge.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,27 @@
+{
+  "runsPerCell": 1,
+  "runTimeoutMinutes": 15,
+  "models": [
+    {
+      "name": "llama3.1-8b",
+      "baseUrl": "http://localhost:11434/v1",
+      "model": "llama3.1:8b",
+      "apiKey": "ollama",
+      "responseFormat": "JsonSchema",
+      "timeoutSeconds": 600
+    },
+    {
+      "name": "hosted-example",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "model": "openai/gpt-4o-mini",
+      "apiKeyEnv": "BENCH_OPENROUTER_KEY",
+      "responseFormat": "JsonSchema",
+      "timeoutSeconds": 120
+    }
+  ],
+  "profiles": [
+    { "name": "2k", "contextTokens": 2048, "reserveOutput": 1024 },
+    { "name": "4k", "contextTokens": 4096, "reserveOutput": 2048 },
+    { "name": "8k", "contextTokens": 8192, "reserveOutput": 2048 }
+  ]
+}
