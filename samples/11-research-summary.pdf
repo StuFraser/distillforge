@@ -1,0 +1,97 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 2 /Kids [6 0 R 8 0 R] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 4053 >>
+stream
+BT
+/F2 20 Tf 1 0 0 1 60 762 Tm (Does Cycle Counting Reduce Inventory Error? A) Tj
+/F2 20 Tf 1 0 0 1 60 738 Tm (Review of the Evidence) Tj
+/F1 10.5 Tf 1 0 0 1 60 717.5 Tm (Prepared by: Dr Imogen Ward, Logistics Research Group) Tj
+/F1 10.5 Tf 1 0 0 1 60 698.5 Tm (Date: October 2026) Tj
+/F2 13 Tf 1 0 0 1 60 669.0 Tm (Abstract) Tj
+/F1 10.5 Tf 1 0 0 1 60 653.5 Tm (Warehouse operators have long relied on annual physical inventories to correct stock records.) Tj
+/F1 10.5 Tf 1 0 0 1 60 639.5 Tm (Cycle counting, in which a small subset of items is counted on a rolling basis, is widely) Tj
+/F1 10.5 Tf 1 0 0 1 60 625.5 Tm (recommended as an alternative. This review summarises 14 studies published between 2009) Tj
+/F1 10.5 Tf 1 0 0 1 60 611.5 Tm (and 2025 to assess whether cycle counting measurably improves inventory record accuracy,) Tj
+/F1 10.5 Tf 1 0 0 1 60 597.5 Tm (and under what conditions.) Tj
+/F2 13 Tf 1 0 0 1 60 568.0 Tm (Background) Tj
+/F1 10.5 Tf 1 0 0 1 60 552.5 Tm (Inventory record accuracy \(IRA\) is the proportion of stock records that match physical quantity) Tj
+/F1 10.5 Tf 1 0 0 1 60 538.5 Tm (within an agreed tolerance. Typical accuracy in manufacturing and distribution settings has been) Tj
+/F1 10.5 Tf 1 0 0 1 60 524.5 Tm (reported at 60 to 75 percent, which is far below the 95 percent or higher that most planning) Tj
+/F1 10.5 Tf 1 0 0 1 60 510.5 Tm (systems assume. Inaccurate records lead to stockouts, excess safety stock, and wasted picking) Tj
+/F1 10.5 Tf 1 0 0 1 60 496.5 Tm (effort.) Tj
+/F2 13 Tf 1 0 0 1 60 467.0 Tm (Method) Tj
+/F1 10.5 Tf 1 0 0 1 60 451.5 Tm (We searched four databases for studies reporting before and after accuracy for sites adopting) Tj
+/F1 10.5 Tf 1 0 0 1 60 437.5 Tm (cycle counting. Studies were included if they measured accuracy at item level and reported the) Tj
+/F1 10.5 Tf 1 0 0 1 60 423.5 Tm (counting frequency. Eleven studies were case studies and three were controlled trials. Quality) Tj
+/F1 10.5 Tf 1 0 0 1 60 409.5 Tm (was assessed using a simple three point scale.) Tj
+/F2 13 Tf 1 0 0 1 60 380.0 Tm (Findings) Tj
+/F1 10.5 Tf 1 0 0 1 60 364.5 Tm (Twelve of the 14 studies reported an improvement in IRA after cycle counting was introduced.) Tj
+/F1 10.5 Tf 1 0 0 1 60 350.5 Tm (The average improvement was 19 percentage points, with a range from 4 to 33. Sites that) Tj
+/F1 10.5 Tf 1 0 0 1 60 336.5 Tm (counted high-value items more often than low-value ones \(an ABC approach\) improved more than) Tj
+/F1 10.5 Tf 1 0 0 1 60 322.5 Tm (sites using a uniform schedule.) Tj
+/F1 10.5 Tf 1 0 0 1 60 303.5 Tm (Three factors appeared to explain most of the variation. First, sites that investigated the cause of) Tj
+/F1 10.5 Tf 1 0 0 1 60 289.5 Tm (each discrepancy, rather than simply adjusting the record, improved faster. Second, blind) Tj
+/F1 10.5 Tf 1 0 0 1 60 275.5 Tm (counts, where the counter is not shown the expected quantity, reduced confirmation bias. Third,) Tj
+/F1 10.5 Tf 1 0 0 1 60 261.5 Tm (sites that triggered extra counts after exceptions, such as short picks, found errors sooner than) Tj
+/F1 10.5 Tf 1 0 0 1 60 247.5 Tm (sites that relied on the schedule alone.) Tj
+/F1 10.5 Tf 1 0 0 1 60 228.5 Tm (Two studies found no significant benefit. Both were in sites with very high staff turnover where) Tj
+/F1 10.5 Tf 1 0 0 1 60 214.5 Tm (counters received little training.) Tj
+/F2 13 Tf 1 0 0 1 60 185.0 Tm (Limitations) Tj
+/F1 10.5 Tf 1 0 0 1 60 169.5 Tm (Most studies were observational and self-reported. Publication bias is likely, since operators) Tj
+/F1 10.5 Tf 1 0 0 1 60 155.5 Tm (with poor results may not publish them. Definitions of tolerance varied between studies, which) Tj
+/F1 10.5 Tf 1 0 0 1 60 141.5 Tm (makes direct comparison difficult.) Tj
+/F2 13 Tf 1 0 0 1 60 112.0 Tm (Recommendations) Tj
+/F1 10.5 Tf 1 0 0 1 60 96.5 Tm (Operators introducing cycle counting should:) Tj
+/F1 10.5 Tf 1 0 0 1 74 77.5 Tm (- Classify items by value and count the highest-value group most often.) Tj
+/F1 10.5 Tf 1 0 0 1 74 61.5 Tm (- Use blind counts by default.) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+7 0 obj
+<< /Length 732 >>
+stream
+BT
+/F1 10.5 Tf 1 0 0 1 74 771.5 Tm (- Investigate every discrepancy above tolerance and record the cause.) Tj
+/F1 10.5 Tf 1 0 0 1 74 755.5 Tm (- Raise count tasks automatically after short picks and zero-stock confirmations.) Tj
+/F1 10.5 Tf 1 0 0 1 74 739.5 Tm (- Train counters and keep turnover in the counting team low.) Tj
+/F2 13 Tf 1 0 0 1 60 713.0 Tm (Further research) Tj
+/F1 10.5 Tf 1 0 0 1 60 697.5 Tm (We recommend a controlled multi-site trial comparing uniform and ABC schedules, and further) Tj
+/F1 10.5 Tf 1 0 0 1 60 683.5 Tm (work on whether handheld prompts for root-cause entry improve the quality of investigation. A) Tj
+/F1 10.5 Tf 1 0 0 1 60 669.5 Tm (follow-up review should be completed by October 2027.) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 7 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000218 00000 n 
+0000000320 00000 n 
+0000004425 00000 n 
+0000004561 00000 n 
+0000005344 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R >>
+startxref
+5480
+%%EOF

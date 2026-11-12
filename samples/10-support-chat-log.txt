@@ -1,0 +1,19 @@
+Support chat transcript, ticket #48213
+Opened: 2 Nov 2026 14:02
+
+Customer (Beth Armitage): Hi, we've been trying to run the weekly stock valuation report since Monday and it times out every time.
+Agent (Raj Patel): Hi Beth, sorry to hear that. Can you tell me which site you're running it for and the date range?
+Customer (Beth Armitage): All sites, 1 Oct to 31 Oct. It used to take about a minute.
+Agent (Raj Patel): Thanks. Do you know if anything changed recently, for example new warehouses or a lot of new SKUs?
+Customer (Beth Armitage): We loaded about 40,000 new SKUs last week for the winter range. That's the only thing I can think of.
+Agent (Raj Patel): That's probably it. The report currently calculates every SKU before filtering. I'll raise this with engineering as a performance bug. In the meantime, can you try running it per site? That should be much lighter.
+Customer (Beth Armitage): Per site works for Avonmouth but Telford still times out.
+Agent (Raj Patel): Understood. I'll attach your results to the bug so the team can reproduce it. Could you send me the report parameters as a screenshot?
+Customer (Beth Armitage): Sending now. Honestly we need this by Friday for the month end close, it's quite urgent.
+Agent (Raj Patel): Noted. I'll mark the ticket as high priority and ask engineering for a manual export by Thursday lunchtime at the latest.
+Customer (Beth Armitage): That would be brilliant. Can the export be in CSV, not PDF?
+Agent (Raj Patel): Yes, CSV is fine. I'll email it to you directly. I'll also ask whether we can add a filter for inactive SKUs, since you'll probably want to exclude those anyway.
+Customer (Beth Armitage): Yes please, that would help a lot. We also have a separate problem with label printing on the Telford dock but I'll raise that in a new ticket.
+Agent (Raj Patel): Sounds good, please do. I'll update this ticket as soon as engineering responds. Is there anything else I can help with?
+Customer (Beth Armitage): No, that's all. Thanks Raj.
+Chat ended 14:31

@@ -1,0 +1,107 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 2 /Kids [6 0 R 8 0 R] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 4061 >>
+stream
+BT
+/F2 20 Tf 1 0 0 1 60 762 Tm (Quarterly Business Review: Q3 2026) Tj
+/F1 10.5 Tf 1 0 0 1 60 741.5 Tm (Account: Northfield Components) Tj
+/F1 10.5 Tf 1 0 0 1 60 722.5 Tm (Prepared by: Priya Nair, Client Success Manager, Stockline Software) Tj
+/F1 10.5 Tf 1 0 0 1 60 703.5 Tm (Meeting date: 12 November 2026) Tj
+/F2 13 Tf 1 0 0 1 60 674.0 Tm (1. Executive summary) Tj
+/F1 10.5 Tf 1 0 0 1 60 658.5 Tm (Northfield has had a steady quarter. System availability was 99.94%, above the 99.9% target, and) Tj
+/F1 10.5 Tf 1 0 0 1 60 644.5 Tm (the new goods-in process went live at Telford on 21 September. Receiving accuracy has risen) Tj
+/F1 10.5 Tf 1 0 0 1 60 630.5 Tm (from 94% to 97.6%, and average trailer wait time has fallen from 2 hours 10 minutes to 52) Tj
+/F1 10.5 Tf 1 0 0 1 60 616.5 Tm (minutes. Two commitments from the last review remain open: the JIT ordering update and the) Tj
+/F1 10.5 Tf 1 0 0 1 60 602.5 Tm (manufacturing demand report.) Tj
+/F2 13 Tf 1 0 0 1 60 573.0 Tm (2. Usage and adoption) Tj
+/F1 10.5 Tf 1 0 0 1 60 557.5 Tm (Active users rose from 118 to 141 over the quarter, driven by the Telford goods-in team. The) Tj
+/F1 10.5 Tf 1 0 0 1 60 543.5 Tm (mobile application now handles 83% of all picks, up from 71%. Adoption of the analytics module) Tj
+/F1 10.5 Tf 1 0 0 1 60 529.5 Tm (remains low, with only 9 of 141 users logging in during September. Helen Shaw has suggested a) Tj
+/F1 10.5 Tf 1 0 0 1 60 515.5 Tm (short training session for buyers and planners.) Tj
+/F2 10 Tf 1 0 0 1 70 497.0 Tm (Metric   |   Q2   |   Q3   |   Change) Tj
+/F1 10 Tf 1 0 0 1 70 481.0 Tm (Active users   |   118   |   141   |   +19%) Tj
+/F1 10 Tf 1 0 0 1 70 465.0 Tm (Mobile pick share   |   71%   |   83%   |   +12 pts) Tj
+/F1 10 Tf 1 0 0 1 70 449.0 Tm (Receiving accuracy   |   94.0%   |   97.6%   |   +3.6 pts) Tj
+/F1 10 Tf 1 0 0 1 70 433.0 Tm (Support tickets   |   212   |   187   |   -12%) Tj
+/F1 10 Tf 1 0 0 1 70 417.0 Tm (Median ticket resolution   |   31 hours   |   22 hours   |   -9 hours) Tj
+/F2 13 Tf 1 0 0 1 60 385.0 Tm (3. Support review) Tj
+/F1 10.5 Tf 1 0 0 1 60 369.5 Tm (There were 187 tickets in the quarter, 14 of them priority one. Eleven of the priority one tickets) Tj
+/F1 10.5 Tf 1 0 0 1 60 355.5 Tm (were resolved within the four-hour target. The three that missed were caused by a label printer) Tj
+/F1 10.5 Tf 1 0 0 1 60 341.5 Tm (driver fault that took two attempts to fix. Engineering has since added the driver to the) Tj
+/F1 10.5 Tf 1 0 0 1 60 327.5 Tm (regression suite. The most common ticket category was report performance \(41 tickets\), mainly) Tj
+/F1 10.5 Tf 1 0 0 1 60 313.5 Tm (stock valuation and slow-moving stock.) Tj
+/F2 13 Tf 1 0 0 1 60 284.0 Tm (4. Roadmap items for Northfield) Tj
+/F1 10.5 Tf 1 0 0 1 60 268.5 Tm (The JIT ordering feature is in beta and is planned for general release in February 2027.) Tj
+/F1 10.5 Tf 1 0 0 1 60 254.5 Tm (Northfield has been offered a place on the beta programme. The manufacturing demand report is) Tj
+/F1 10.5 Tf 1 0 0 1 60 240.5 Tm (behind schedule because the data model needs to change to support multi-level bills of materials.) Tj
+/F1 10.5 Tf 1 0 0 1 60 226.5 Tm (A revised date will be given by the end of November.) Tj
+/F1 10.5 Tf 1 0 0 1 60 207.5 Tm (The Poland and Vietnam supplier onboarding is not currently supported by the standard portal.) Tj
+/F1 10.5 Tf 1 0 0 1 60 193.5 Tm (Stockline proposes an interim approach using CSV uploads and will provide a written estimate) Tj
+/F1 10.5 Tf 1 0 0 1 60 179.5 Tm (for a full portal option by 4 December.) Tj
+/F2 13 Tf 1 0 0 1 60 150.0 Tm (5. Commercial) Tj
+/F1 10.5 Tf 1 0 0 1 60 134.5 Tm (The contract renews on 1 April 2027. Based on the growth in users, the licence count will need) Tj
+/F1 10.5 Tf 1 0 0 1 60 120.5 Tm (to rise from 150 to 200. Stockline will send a renewal proposal by 15 January. Northfield has) Tj
+/F1 10.5 Tf 1 0 0 1 60 106.5 Tm (asked for a multi-year option with a price hold, and for the proposal to show the cost of the) Tj
+/F1 10.5 Tf 1 0 0 1 60 92.5 Tm (analytics module separately.) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+7 0 obj
+<< /Length 1656 >>
+stream
+BT
+/F2 13 Tf 1 0 0 1 60 769 Tm (6. Risks) Tj
+/F1 10.5 Tf 1 0 0 1 74 753.5 Tm (- Report performance may worsen as SKU counts grow after the winter range is loaded.) Tj
+/F1 10.5 Tf 1 0 0 1 74 737.5 Tm (- Key person dependency: the Telford configuration knowledge sits with one super-user,) Tj
+/F1 10.5 Tf 1 0 0 1 84 723.5 Tm (Owen Price.) Tj
+/F1 10.5 Tf 1 0 0 1 74 707.5 Tm (- Peak season starts in late November and a change freeze will apply from 20 November to) Tj
+/F1 10.5 Tf 1 0 0 1 84 693.5 Tm (4 January.) Tj
+/F2 13 Tf 1 0 0 1 60 667.0 Tm (7. Agreed actions) Tj
+/F1 10.5 Tf 1 0 0 1 74 651.5 Tm (1. Priya to confirm a beta slot for JIT ordering by 20 November.) Tj
+/F1 10.5 Tf 1 0 0 1 74 635.5 Tm (2. Priya to deliver the revised manufacturing demand report date by 30 November.) Tj
+/F1 10.5 Tf 1 0 0 1 74 619.5 Tm (3. Stockline to estimate the supplier portal for Poland and Vietnam by 4 December.) Tj
+/F1 10.5 Tf 1 0 0 1 74 603.5 Tm (4. Helen to nominate six buyers for analytics training.) Tj
+/F1 10.5 Tf 1 0 0 1 74 587.5 Tm (5. Owen to document the Telford configuration and share it with Stockline support.) Tj
+/F1 10.5 Tf 1 0 0 1 74 571.5 Tm (6. Stockline engineering to profile the stock valuation report and propose fixes by 11) Tj
+/F1 10.5 Tf 1 0 0 1 84 557.5 Tm (December.) Tj
+/F1 10.5 Tf 1 0 0 1 74 541.5 Tm (7. Priya to send the renewal proposal, including multi-year pricing, by 15 January.) Tj
+/F2 13 Tf 1 0 0 1 60 515.0 Tm (8. Next review) Tj
+/F1 10.5 Tf 1 0 0 1 60 499.5 Tm (The next quarterly review is scheduled for February 2027. Helen will send calendar invitations) Tj
+/F1 10.5 Tf 1 0 0 1 60 485.5 Tm (once dates are agreed.) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 7 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000218 00000 n 
+0000000320 00000 n 
+0000004433 00000 n 
+0000004569 00000 n 
+0000006277 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R >>
+startxref
+6413
+%%EOF
