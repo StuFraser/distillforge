@@ -204,7 +204,7 @@ sealed class Options
           --docs <a,b>        only files whose name starts with one of these, e.g. 01,04
           --models <a,b>      only these model names from the config
           --profiles <a,b>    only these profile names from the config
-          --max-docs <n>      stop after n documents (cheap smoke test)
+          --max-docs <n>      only run the first n documents, in filename order (cheap smoke test)
           --runs <n>          repeats per cell (overrides the config; use 2-3 to see variance)
           --out <dir>         result folder (default bench-results)
           --baseline <file>   earlier JSON report to compare against

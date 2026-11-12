@@ -12,7 +12,7 @@ cp tools/DistillForge.Bench/bench.sample.json tools/DistillForge.Bench/bench.jso
 dotnet run --project tools/DistillForge.Bench -- --config tools/DistillForge.Bench/bench.json
 ```
 
-Handy options: `--docs 01,04` (name prefixes), `--models`, `--profiles`, `--max-docs 2` (smoke test),
+Handy options: `--docs 01,04` (name prefixes), `--models`, `--profiles`, `--max-docs 2` (first 2 documents only; smoke test),
 `--runs 3` (repeats, shows spread), `--baseline bench-results/bench-<earlier>.json` (note-count deltas). `--help` lists all.
 
 For hosted providers put the key in an environment variable and name it with `apiKeyEnv`; don't put keys in `bench.json`.
