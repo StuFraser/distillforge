@@ -36,7 +36,8 @@ public sealed class ExtractionRunner(
             .Where(r => r.Id == runId && r.Status == ExtractionRunStatus.Queued)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(r => r.Status, ExtractionRunStatus.Running)
-                .SetProperty(r => r.StartedAt, started), hostCt);
+                .SetProperty(r => r.StartedAt, started)
+                .SetProperty(r => r.HeartbeatAt, started), hostCt);
         if (claimed == 0)
         {
             logger.LogInformation("Extraction run {RunId} was cancelled before it started.", runId);
@@ -49,7 +50,7 @@ public sealed class ExtractionRunner(
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(hostCt, userCancel.Token);
         var ct = linked.Token;
         using var watcherStop = CancellationTokenSource.CreateLinkedTokenSource(hostCt);
-        var watcher = WatchForCancelAsync(runId, userCancel, watcherStop.Token);
+        var watcher = WatchRunAsync(runId, userCancel, watcherStop.Token);
         var cancelledByUser = false;
 
         try
@@ -180,12 +181,19 @@ public sealed class ExtractionRunner(
         run.Error = error;
     }
 
-    /// <summary>Polls (on its own DbContext; ours isn't thread-safe) and fires <paramref name="userCancel"/> when the run is marked Cancelled.</summary>
-    private async Task WatchForCancelAsync(Guid runId, CancellationTokenSource userCancel, CancellationToken stop)
+    /// <summary>
+    /// Runs alongside the run on its own DbContext (ours isn't thread-safe). Every 2 s it fires <paramref name="userCancel"/>
+    /// if the run was marked Cancelled; every <see cref="RunStaleness.HeartbeatInterval"/> it stamps the run's heartbeat so a
+    /// hard-killed host can be detected (see <see cref="ExtractionRunReaper"/>). A transient error must not end the loop, or the
+    /// heartbeat would stop and a healthy run would be reaped.
+    /// </summary>
+    private async Task WatchRunAsync(Guid runId, CancellationTokenSource userCancel, CancellationToken stop)
     {
-        try
+        var lastBeat = DateTimeOffset.UtcNow;
+        int consecutiveErrors = 0;
+        while (!stop.IsCancellationRequested)
         {
-            while (!stop.IsCancellationRequested)
+            try
             {
                 await Task.Delay(TimeSpan.FromSeconds(2), stop);
                 await using var scope = scopes.CreateAsyncScope();
@@ -193,10 +201,25 @@ public sealed class ExtractionRunner(
                 var status = await scoped.ExtractionRuns.AsNoTracking()
                     .Where(r => r.Id == runId).Select(r => r.Status).FirstOrDefaultAsync(stop);
                 if (status == ExtractionRunStatus.Cancelled) { userCancel.Cancel(); return; }
+
+                var now = DateTimeOffset.UtcNow;
+                if (now - lastBeat >= RunStaleness.HeartbeatInterval)
+                {
+                    await scoped.ExtractionRuns
+                        .Where(r => r.Id == runId && r.Status == ExtractionRunStatus.Running)
+                        .ExecuteUpdateAsync(s => s.SetProperty(r => r.HeartbeatAt, now), stop);
+                    lastBeat = now;
+                }
+                consecutiveErrors = 0;
+            }
+            catch (OperationCanceledException) { return; }
+            catch (Exception ex)
+            {
+                // Log the first failure and then every 10th, so a long database outage doesn't flood the log.
+                if (consecutiveErrors++ % 10 == 0)
+                    logger.LogWarning(ex, "Run {RunId}: cancel/heartbeat check failed ({Count} in a row); will keep trying.", runId, consecutiveErrors);
             }
         }
-        catch (OperationCanceledException) { }
-        catch (Exception ex) { logger.LogWarning(ex, "Cancel watcher for run {RunId} stopped; a user cancel will not interrupt this run.", runId); }
     }
 
     /// <summary>Persists live progress so the polling client can show where the run is up to.</summary>

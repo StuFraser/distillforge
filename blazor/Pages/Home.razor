@@ -95,7 +95,7 @@
                 <h2>Uncategorised</h2>
                 @if (IsExtracting)
                 {
-                    <button type="button" class="status running as-button" @onclick="() => _progressHidden = false" title="Show progress">@ProgressText</button>
+                    <button type="button" class="status running as-button" @onclick="() => _progressHidden = false" title="Show progress">@ProgressText@(_connectionLost ? " · connection lost, retrying…" : "")</button>
                 }
                 else if (_run?.Status == ExtractionRunStatus.Cancelled)
                 {
@@ -222,7 +222,7 @@
 
 @if (IsExtracting && !_progressHidden && _run is not null)
 {
-    <ExtractionProgressDialog Run="_run" Cancelling="_cancelling" OnHide="() => _progressHidden = true" OnCancel="CancelExtraction" />
+    <ExtractionProgressDialog Run="_run" Cancelling="_cancelling" ConnectionLost="_connectionLost" OnHide="() => _progressHidden = true" OnCancel="CancelExtraction" />
 }
 
 @if (_paneMenu)
@@ -694,7 +694,7 @@
         ResetFilters();
         ClearSelection();
         // A run left in flight (e.g. page refreshed mid-extraction) is picked up again.
-        if (IsExtracting) _ = PollRun();
+        if (IsExtracting) _ = ResumePolling();
     }
 
     private async Task OnWorkspaceChosen(ChangeEventArgs e)
@@ -803,13 +803,51 @@
         catch (OperationCanceledException) { }
     }
 
+    /// <summary>Poll for a run found in flight on load. Nobody awaits this, so surface any failure instead of losing it.</summary>
+    private async Task ResumePolling()
+    {
+        try { await PollRun(); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _error = ex.Message; StateHasChanged(); }
+    }
+
+    private bool _polling, _connectionLost;
+    private static readonly Random Jitter = new();
+
+    /// <summary>
+    /// Polls the run until it finishes. A failed poll (API down, restarting, 5xx) is not the end of the run: keep the last
+    /// known state, tell the user we lost contact, and keep trying with a short back-off until the API answers again.
+    /// </summary>
     private async Task PollRun()
     {
-        while (IsExtracting && !_cts.IsCancellationRequested)
+        if (_polling) return; // StartExtraction and a page reload can both ask; one loop is enough
+        _polling = true;
+        try
         {
-            await Task.Delay(TimeSpan.FromSeconds(1), _cts.Token);
-            _run = await Api.GetRunAsync(_run!.Id, _cts.Token);
-            StateHasChanged();
+            int failures = 0;
+            while (IsExtracting && !_cts.IsCancellationRequested)
+            {
+                // 1 s normally; after a failure back off to ~3 s, with jitter so many browsers don't hit a recovering API together.
+                var delay = failures == 0 ? 1000 : 2500 + Jitter.Next(0, 1000);
+                await Task.Delay(delay, _cts.Token);
+                try
+                {
+                    _run = await Api.GetRunAsync(_run!.Id, _cts.Token);
+                    failures = 0;
+                    _connectionLost = false;
+                }
+                catch (ApiException)
+                {
+                    failures++;
+                    _connectionLost = true;
+                }
+                StateHasChanged();
+            }
+        }
+        finally
+        {
+            _polling = false;
+            _connectionLost = false;
         }
         if (_run?.Status == ExtractionRunStatus.Succeeded && _workspace is not null)
         {

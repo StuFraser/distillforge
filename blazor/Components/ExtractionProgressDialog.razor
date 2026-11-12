@@ -41,6 +41,11 @@
             }
         </ol>
 
+        @if (ConnectionLost)
+        {
+            <p class="status failed connection-lost" role="alert">Lost contact with the API. Still trying to reconnect; the extraction may still be running on the server.</p>
+        }
+
         <div class="dialog-actions progress-footer">
             <span class="muted">Elapsed @Elapsed.ToString(@"m\:ss")</span>
             <span class="provider-actions">
@@ -57,6 +62,7 @@
     [Parameter] public EventCallback OnHide { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public bool Cancelling { get; set; }
+    [Parameter] public bool ConnectionLost { get; set; }
 
     private readonly DateTime _started = DateTime.UtcNow;
     private readonly CancellationTokenSource _cts = new();

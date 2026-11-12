@@ -48,6 +48,9 @@ public sealed class ExtractionFunctions(DistillForgeDbContext db, ExtractionRunn
             .Where(r => r.WorkspaceId == id && (r.Status == ExtractionRunStatus.Queued || r.Status == ExtractionRunStatus.Running))
             .OrderByDescending(r => r.CreatedAt)
             .FirstOrDefaultAsync(ct);
+        // An orphaned Running run (host was killed) would otherwise block re-extraction forever.
+        if (active is not null && await ExtractionRunReaper.FailIfStaleAsync(db, active, ct))
+            active = null;
         if (active is not null)
             return new StartExtractionOutput { Result = new ConflictObjectResult(active.ToDto()) };
 
@@ -76,6 +79,7 @@ public sealed class ExtractionFunctions(DistillForgeDbContext db, ExtractionRunn
         CancellationToken ct)
     {
         var run = await db.ExtractionRuns.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (run is not null) await ExtractionRunReaper.FailIfStaleAsync(db, run, ct);
         return run is null ? new NotFoundResult() : new OkObjectResult(run.ToDto());
     }
 

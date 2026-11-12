@@ -112,6 +112,9 @@ public class ExtractionRun
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
 
+    /// <summary>Stamped every few seconds while a worker is executing the run. A Running run whose heartbeat has gone quiet was orphaned (host killed); see RunStaleness.</summary>
+    public DateTimeOffset? HeartbeatAt { get; set; }
+
     public Workspace? Workspace { get; set; }
 }
 

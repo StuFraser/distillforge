@@ -226,7 +226,9 @@
                     Some services don't list their models; you can still type the model ID by hand.</dd>
 
                 <dt>Extraction failed, or "interrupted"</dt>
-                <dd>Read the message in the status line. "Interrupted" means the server stopped the job (for example a very long run timed out). Try a faster model or larger windows, or split the document.</dd>
+                <dd>Read the message in the status line. "Interrupted" means the server stopped the job (for example a very long run timed out, or the API was shut down or crashed part-way). A run that loses its worker is marked failed after about a minute and a half. Your existing notes are not touched, so just run it again. If it keeps timing out, try a faster model or larger windows, or split the document.</dd>
+                <dt>"Lost contact with the API, retrying…"</dt>
+                <dd>The page can't reach the server right now. It keeps trying and carries on by itself when the API is back; the extraction may still be running meanwhile. If the API was restarted, the run will show as failed once the server notices it was interrupted.</dd>
 
                 <dt>"Response was truncated"</dt>
                 <dd>The model ran out of output space. Raise <em>Reserved output</em> (keeping it below the context window) or use smaller windows.</dd>

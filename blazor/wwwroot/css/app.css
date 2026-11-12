@@ -231,6 +231,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @keyframes stripes { to { background-position: 16px 0; } }
 .bar-fill.indeterminate { width: 40%; position: absolute; animation: slide 1.3s ease-in-out infinite alternate, stripes 0.8s linear infinite; }
 @keyframes slide { from { left: 0; } to { left: 60%; } }
+.connection-lost { margin: 0.75rem 0 0; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; }
 .progress-footer { justify-content: space-between; align-items: center; }
 @media (prefers-reduced-motion: reduce) { .spinner, .bar-fill.working, .bar-fill.indeterminate { animation: none; } }
 
