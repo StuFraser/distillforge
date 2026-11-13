@@ -1,0 +1,139 @@
+@using DistillForge.Core.Export
+@inject IJSRuntime JS
+
+<div class="dialog-backdrop" @onclick="OnClose">
+    <div class="dialog share-dialog" role="dialog" aria-modal="true" aria-labelledby="share-title" @onclick:stopPropagation="true" @onkeydown="OnKey">
+        <h2 id="share-title">Share by email</h2>
+        <p class="muted share-lead">Nothing is sent from here. “Open in email app” fills in a new message for you to review and send yourself.</p>
+
+        <label for="share-scope">What to share</label>
+        <select id="share-scope" value="@_scope" @onchange="OnScopeChanged">
+            @for (var i = 0; i < Scopes.Count; i++)
+            {
+                <option value="@i">@Scopes[i].Name (@EmailExport.Shareable(Scopes[i].Notes).Count)</option>
+            }
+        </select>
+
+        @if (Shareable.Count > 0)
+        {
+            <div>
+                <span class="field-label">Notes included</span>
+                <ul class="share-notes">
+                    @foreach (var n in Shareable)
+                    {
+                        <li>
+                            <label>
+                                <input type="checkbox" checked="@_included.Contains(n.Id)" @onchange="e => Toggle(n.Id, (bool)e.Value!)" />
+                                @n.Title
+                            </label>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+        else
+        {
+            <p class="muted">There are no notes in this selection.</p>
+        }
+
+        <div>
+            <span class="field-label">Details to include</span>
+            <div class="share-options">
+                <label><input type="checkbox" @bind="_owner" /> Owner</label>
+                <label><input type="checkbox" @bind="_due" /> Due</label>
+                <label><input type="checkbox" @bind="_summary" /> Summary</label>
+                <label><input type="checkbox" @bind="_source" /> Source quote</label>
+            </div>
+        </div>
+
+        <label for="share-to">To <span class="muted">(optional; separate addresses with commas)</span></label>
+        <input id="share-to" type="text" @bind="_to" @bind:event="oninput" placeholder="name@example.com" autocomplete="off" />
+
+        <label for="share-subject">Subject</label>
+        <input id="share-subject" type="text" value="@Subject" @oninput="e => { _subject = e.Value?.ToString(); }" />
+
+        <div>
+            <span class="field-label">Preview</span>
+            <pre class="share-preview" aria-label="Email preview">@Draft.Body</pre>
+        </div>
+
+        @if (Link.Truncated)
+        {
+            <p class="warning" role="status">
+                Email links are limited in length, so the message will include the first @Link.Included of @Link.Total notes.
+                Use <strong>Copy</strong> to get everything and paste it into your email.
+            </p>
+        }
+
+        <div class="dialog-actions">
+            <button type="button" class="secondary" @onclick="OnClose">Close</button>
+            <button type="button" class="secondary" @onclick="Copy" disabled="@(Included.Count == 0)">@(_copied ? "Copied ✓" : "Copy")</button>
+            @if (Included.Count == 0)
+            {
+                <span class="button primary disabled" aria-disabled="true">Open in email app</span>
+            }
+            else
+            {
+                <a class="button primary" href="@Link.Uri">Open in email app</a>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>A named group of notes the user can choose to share, e.g. one category or everything.</summary>
+    public sealed record Scope(string Name, IReadOnlyList<ActionItemDto> Notes);
+
+    [Parameter, EditorRequired] public string WorkspaceTitle { get; set; } = "";
+    [Parameter, EditorRequired] public IReadOnlyList<Scope> Scopes { get; set; } = [];
+    [Parameter] public int InitialScope { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private int _scope;
+    private readonly HashSet<Guid> _included = [];
+    private bool _owner = true, _due = true, _summary = true, _source = true, _copied;
+    private string _to = "";
+    private string? _subject; // null = follow the generated subject; set once the user edits it
+
+    protected override void OnInitialized()
+    {
+        _scope = Math.Clamp(InitialScope, 0, Math.Max(0, Scopes.Count - 1));
+        SelectAll();
+    }
+
+    private IReadOnlyList<ActionItemDto> Shareable => Scopes.Count == 0 ? [] : EmailExport.Shareable(Scopes[_scope].Notes);
+    private IReadOnlyList<ActionItemDto> Included => Shareable.Where(n => _included.Contains(n.Id)).ToList();
+    private EmailOptions Options => new(_owner, _due, _summary, _source);
+    private EmailDraft Draft => EmailExport.Build(WorkspaceTitle, Scopes.Count == 0 ? "" : Scopes[_scope].Name, Included, Options);
+    private string Subject => _subject ?? Draft.Subject;
+    private MailtoResult Link => MailtoLink.Build(_to, Draft with { Subject = Subject });
+
+    private void SelectAll()
+    {
+        _included.Clear();
+        foreach (var n in Shareable) _included.Add(n.Id);
+    }
+
+    private void OnScopeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var i) && i >= 0 && i < Scopes.Count) _scope = i;
+        _subject = null; // the generated subject names the scope
+        _copied = false;
+        SelectAll();
+    }
+
+    private void Toggle(Guid id, bool on)
+    {
+        if (on) _included.Add(id); else _included.Remove(id);
+        _copied = false;
+    }
+
+    private async Task Copy()
+    {
+        var text = Subject + "\n\n" + Draft.Body;
+        try { _copied = await JS.InvokeAsync<bool>("distillforge.copyText", text); }
+        catch (JSException) { _copied = false; }
+    }
+
+    private Task OnKey(KeyboardEventArgs e) => e.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
+}

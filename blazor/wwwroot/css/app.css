@@ -353,3 +353,16 @@ button.primary:disabled, button.secondary:disabled { opacity: 0.55; cursor: not-
 /* "New note from selection" button floats beside the selected passage */
 .selection-action { position: fixed; z-index: 15; padding: 6px 12px; border: none; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; font-size: 0.85rem; cursor: pointer; box-shadow: 0 4px 14px rgba(17,24,39,0.25); }
 .selection-action:hover { filter: brightness(1.1); }
+
+/* ---- Share by email ---- */
+.share-dialog { width: min(640px, calc(100vw - 32px)); }
+.share-dialog input[type=text] { width: 100%; box-sizing: border-box; font: inherit; font-size: 0.9rem; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px; }
+.share-lead { margin: -4px 0 0; white-space: normal; }
+.share-notes { list-style: none; margin: 0; padding: 6px 10px; max-height: 140px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.share-notes label, .share-options label { font-weight: 400; display: flex; gap: 8px; align-items: center; }
+.share-options { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.share-preview { margin: 0; padding: 10px 12px; max-height: 220px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; }
+.panel-header .share-btn { margin-left: auto; padding: 4px 10px; font-size: 0.85rem; }
+.panel-header .status + .share-btn { margin-left: 8px; }
+a.button.primary, span.button.primary { display: inline-block; background: var(--accent); color: #fff; border-radius: 8px; padding: 8px 14px; font-weight: 600; text-decoration: none; cursor: pointer; }
+span.button.primary.disabled { opacity: 0.55; cursor: not-allowed; }

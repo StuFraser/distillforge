@@ -111,6 +111,8 @@
                         @_run.ActionItemCount found@(string.IsNullOrEmpty(_run.Model) ? "" : $" · {_run.Model}")@(_run.PromptTokens is int p ? $" · {p:N0} prompt tokens" : "")@(string.IsNullOrEmpty(_run.Warnings) ? "" : " · warnings")
                     </span>
                 }
+                <button type="button" class="secondary share-btn" @onclick="() => OpenShare(0)" disabled="@(_workspace is null || ShareableCount == 0)"
+                        title="Share notes by email">✉ Share</button>
             </header>
             @if (_actions.Count > 0)
             {
@@ -190,6 +192,11 @@
                     <span class="tab placeholder">No categories yet</span>
                 }
                 <span class="tab-spacer"></span>
+                @if (ActiveCategory is not null)
+                {
+                    <button type="button" class="icon-button" title="Share this category by email" aria-label="Share this category by email"
+                            @onclick="() => OpenShare(1 + _categories.IndexOf(ActiveCategory))">✉</button>
+                }
                 @if (CanEdit)
                 {
                     <button type="button" class="icon-button" title="Add category" aria-label="Add category" @onclick="OpenCategoryNew">＋</button>
@@ -256,6 +263,11 @@
                       OnSave="SaveItem" OnCancel="CloseItem" />
 }
 
+@if (_shareOpen && _workspace is not null)
+{
+    <ShareDialog WorkspaceTitle="@_workspace.Title" Scopes="ShareScopes" InitialScope="_shareScope" OnClose="() => _shareOpen = false" />
+}
+
 @if (_categoryDialog)
 {
     <CategoryDialog Existing="_categoryEditing" Busy="_categorySaving" Error="@_categoryError" OnSave="SaveCategory" OnCancel="() => _categoryDialog = false" />
@@ -313,6 +325,25 @@
     private string? _categoryError;
 
     private bool CanEdit => _workspace is { IsArchived: false } && !IsExtracting;
+
+    // ---- Share by email ----
+    private bool _shareOpen;
+    private int _shareScope;
+    private int ShareableCount => _actions.Count(a => a.MergedIntoId is null);
+
+    /// <summary>Uncategorised, then each category in tab order, then everything: the groups the share dialog offers.</summary>
+    private List<ShareDialog.Scope> ShareScopes =>
+    [
+        new("Uncategorised", _actions.Where(a => a.CategoryId is null).ToList()),
+        .. _categories.Select(c => new ShareDialog.Scope(c.Name, _actions.Where(a => a.CategoryId == c.Id).ToList())),
+        new("Everything", _actions.ToList()),
+    ];
+
+    private void OpenShare(int scopeIndex)
+    {
+        _shareScope = scopeIndex;
+        _shareOpen = true;
+    }
 
     private CategoryDto? ActiveCategory => _categories.FirstOrDefault(c => c.Id == _activeCategoryId) ?? _categories.FirstOrDefault();
     private List<ActionItemDto> InActive => ActiveCategory is { } c ? _actions.Where(a => a.CategoryId == c.Id).ToList() : [];

@@ -11,6 +11,7 @@
         <a href="help#addnotes">Adding, editing and deleting notes</a>
         <a href="help#duplicates">Duplicates and merging</a>
         <a href="help#categories">Categories</a>
+        <a href="help#share">Sharing notes by email</a>
         <a href="help#workspaces">Workspaces</a>
         <a href="help#ai">Setting up AI</a>
         <a href="help#tuning">Getting better results</a>
@@ -133,6 +134,22 @@
             </ul>
             <p class="note-callout">Re-extracting a document replaces its extracted notes, including any you've edited or filed into categories. Categories themselves are kept,
                 and so are notes you added yourself.</p>
+        </section>
+
+        <section id="share">
+            <h2>Sharing notes by email</h2>
+            <p>
+                Use <strong>✉ Share</strong> in the Uncategorised header, or the <strong>✉</strong> button beside a category's tabs, to turn notes into an email.
+                It works in archived workspaces too.
+            </p>
+            <ul>
+                <li><strong>What to share:</strong> Uncategorised, any single category, or everything. Untick any notes you want to leave out. Notes that were merged into another note aren't listed separately.</li>
+                <li><strong>Details:</strong> choose whether the email includes each note's owner, due date, summary and source quote.</li>
+                <li><strong>Open in email app</strong> starts a new message in your default mail program, with the subject and text filled in (and the <em>To</em> address if you entered one). <strong>Nothing is sent from DistillForge</strong>: you review and send it yourself.</li>
+                <li><strong>Copy</strong> puts the whole message on the clipboard, to paste into any email, chat or document.</li>
+            </ul>
+            <p class="note-callout">Email links have a length limit (about 2,000 characters), so a long list is cut at a whole note and the message says how many were left out. Use <strong>Copy</strong> to get the full list.
+                If nothing opens, your computer may not have a default mail program set up; Copy always works.</p>
         </section>
 
         <section id="workspaces">
@@ -281,6 +298,7 @@
             <h2>Your data</h2>
             <ul>
                 <li>The text you add is sent to the AI provider <em>you</em> configure for extraction. If that's a hosted service, your text leaves your network; use a local model for sensitive documents.</li>
+                <li>Sharing by email only builds a message on your own computer: it goes through your mail program, not through DistillForge's servers. What you send is up to you.</li>
                 <li>Documents, notes and categories are stored in the DistillForge database. API keys are stored encrypted and are never sent back to the browser.</li>
             </ul>
         </section>

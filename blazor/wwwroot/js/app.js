@@ -5,6 +5,24 @@ window.distillforge = {
   }
 };
 
+// Copies text to the clipboard. Falls back to a hidden textarea where the async clipboard API is unavailable (e.g. plain http).
+window.distillforge.copyText = async function (text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+  } catch (e) { /* fall through to the legacy path */ }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+};
+
 // Firefox won't start a drag unless dataTransfer has data; Blazor can't set it, so do it here.
 document.addEventListener('dragstart', function (e) {
   if (e.target && e.target.classList && e.target.classList.contains('note-wrap') && e.dataTransfer) {
