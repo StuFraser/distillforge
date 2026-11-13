@@ -246,8 +246,9 @@
             <p><strong>Local servers (Ollama and similar)</strong></p>
             <ul>
                 <li>The context window the server runs with is set on the server, not by this app. Changing it usually needs the server (or the loaded model) to be restarted before it takes effect, so a setting you changed may not be live yet.</li>
-                <li>Ollama's OpenAI-compatible endpoint can't change the context per request. Set it for the server, or create a model with a larger <code>num_ctx</code> in its Modelfile and add that model here.</li>
-                <li>On Ollama, <code>ollama ps</code> shows the context length a loaded model is actually using.</li>
+                <li>Ollama's OpenAI-compatible endpoint (<code>/v1</code>) can't change the context per request, and the server-wide setting (<code>OLLAMA_CONTEXT_LENGTH</code> or the settings screen) may not apply to it: requests can still be cut off at 2048 or 4096 tokens. The reliable fix is a model with the context built in. Save a Modelfile containing <code>FROM your-model</code> and <code>PARAMETER num_ctx 8192</code>, run <code>ollama create your-model-8k -f Modelfile</code>, and add that model here.</li>
+                <li><code>ollama ps</code> shows the context for models loaded from the command line, which can differ from what requests through this app get. If a run's status line warns that the reported prompt size is far below what was sent, the server is truncating: build a Modelfile variant as above.</li>
+
                 <li>If a run's warnings say <em>"Prompt tokens reported … are far below the estimate"</em>, treat that run's results as unreliable: the server cut the input. Fix the server setting (or lower the app's context window to match) and re-extract.</li>
             </ul>
 
