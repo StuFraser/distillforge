@@ -17,7 +17,8 @@ public sealed record PipelineStats(
     int ConsolidationMerged,
     bool ConsolidationRan,
     bool ConsolidationSkipped,
-    bool ConsolidationFailed);
+    bool ConsolidationFailed,
+    int ConsolidationCalls = 0);
 
 public sealed record PipelineResult(
     IReadOnlyList<ValidatedActionPoint> ActionPoints,
@@ -98,49 +99,35 @@ public static class ExtractionPipeline
             logger.LogInformation("Merged {Merged} duplicate action point(s) across windows.", found.Count - merged.Count);
 
         // Pass 2: ask the model to spot paraphrased duplicates. Only worth it when windows overlapped.
+        // A list too long for one prompt is consolidated in batches (see ConsolidationBatcher).
         bool ran = false, skipped = false, consolidationFailed = false;
-        int consolidationMerged = 0;
+        int consolidationMerged = 0, consolidationCalls = 0;
         if (windows.Count > 1 && merged.Count > 1)
         {
             if (progress is not null) await progress(ExtractionPhase.Consolidating, windows.Count, windows.Count);
-            try
+            var batched = await ConsolidationBatcher.RunAsync(merged, extractor, logger, ct);
+            consolidationCalls = batched.Calls;
+            skipped = batched.Skipped;
+            ran = batched.Calls > 0;
+            consolidationFailed = batched.Calls > 0 && batched.FailedCalls == batched.Calls;
+            warnings.AddRange(batched.Warnings);
+            if (ran)
             {
-                var candidates = ActionPointConsolidator.ToCandidates(merged);
-                int estimate = extractor.EstimateConsolidationTokens(candidates);
-                if (estimate > extractor.PromptBudgetTokens)
-                {
-                    skipped = true;
-                    warnings.Add($"Consolidation skipped: {candidates.Count} candidates (~{estimate} tokens) exceed the prompt budget; duplicates may remain.");
-                }
-                else
-                {
-                    ran = true;
-                    var result = await extractor.ConsolidateAsync(candidates, ct);
-                    var outcome = ActionPointConsolidator.Apply(merged, result.Response);
-                    foreach (var (a, b) in ActionPointConsolidator.PossiblePairs(result.Response, outcome.FinalIndexOf))
-                        aiPossible.Add((outcome.ActionPoints[a], outcome.ActionPoints[b]));
-                    merged = outcome.ActionPoints.ToList();
-                    consolidationMerged = outcome.MergedCount;
-                    warnings.AddRange(result.Warnings.Concat(outcome.Warnings).Select(w => "Consolidation: " + w));
-                    promptTokens = Add(promptTokens, result.Usage?.PromptTokens);
-                    completionTokens = Add(completionTokens, result.Usage?.CompletionTokens);
-                    logger.LogInformation("Consolidation merged {Merged} further action point(s).", outcome.MergedCount);
-                }
-            }
-            catch (Exception ex) when (!ct.IsCancellationRequested
-                && ex is ExtractionFailedException or HttpRequestException or TaskCanceledException)
-            {
-                // Non-fatal: the deterministic merge above is still a usable result.
-                consolidationFailed = true;
-                logger.LogError(ex, "Consolidation failed.");
-                warnings.Add($"Consolidation pass failed ({ex.Message}); duplicates may remain.");
+                foreach (var (a, b) in batched.PossiblePairs)
+                    aiPossible.Add((batched.Points[a], batched.Points[b]));
+                merged = batched.Points.ToList();
+                consolidationMerged = batched.MergedCount;
+                promptTokens = Add(promptTokens, batched.PromptTokens);
+                completionTokens = Add(completionTokens, batched.CompletionTokens);
+                logger.LogInformation("Consolidation: {Calls} call(s), merged {Merged} further action point(s).",
+                    batched.Calls, batched.MergedCount);
             }
         }
         merged = merged.OrderBy(ap => ap.Evidence[0].Start).ToList();
 
         return new PipelineResult(merged, aiPossible, warnings, promptTokens, completionTokens, model, finishReason,
             new PipelineStats(windows.Count, failed, windowBudget, estimatedPromptTokens, found.Count, afterWindowMerge,
-                consolidationMerged, ran, skipped, consolidationFailed));
+                consolidationMerged, ran, skipped, consolidationFailed, consolidationCalls));
     }
 
     private static int? Add(int? total, int? value) => value is null ? total : (total ?? 0) + value;
