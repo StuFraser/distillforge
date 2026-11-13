@@ -65,6 +65,19 @@ public enum ExtractionPhase
     Consolidating,
 }
 
+/// <summary>
+/// How readily the consolidation pass merges notes it thinks are duplicates.
+/// Low: never merges, only flags possible duplicates for the user. Medium: merges clear repeats, flags the unsure ones.
+/// Aggressive: also merges same-outcome tasks that are worded differently or split across the document.
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<MergeLevel>))]
+public enum MergeLevel
+{
+    Low,
+    Medium,
+    Aggressive,
+}
+
 public sealed record ExtractionRunDto(
     Guid Id,
     Guid WorkspaceId,
@@ -80,4 +93,5 @@ public sealed record ExtractionRunDto(
     ExtractionPhase? Phase = null,
     int? WindowIndex = null,
     int? WindowCount = null,
-    Guid? AiModelId = null);
+    Guid? AiModelId = null,
+    MergeLevel? MergeLevel = null);

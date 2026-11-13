@@ -1,5 +1,6 @@
 using DistillForge.Api.Ai;
 using DistillForge.Api.Services;
+using DistillForge.Core.Contracts;
 using DistillForge.Core.Extraction;
 using DistillForge.Core.Segmentation;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,6 +11,8 @@ public class ConsolidationBatcherTests
 {
     private static ValidatedActionPoint Ap(string title, int pos) =>
         new(title, null, null, null, [new ResolvedEvidence($"S{pos}", "q", pos * 10, pos * 10 + 5, MatchQuality.Exact)]);
+
+    private static ValidatedActionPoint Owned(string title, int pos, string owner) => Ap(title, pos) with { Owner = owner };
 
     /// <summary>Costs 20 tokens of prompt per candidate plus 10 overhead; merges candidates with identical titles.</summary>
     private sealed class FakeExtractor(int budget) : IActionExtractor
@@ -24,7 +27,7 @@ public class ConsolidationBatcherTests
         public Task<ExtractionResult> ExtractAsync(ExtractionWindow window, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
-        public Task<ConsolidationResult> ConsolidateAsync(IReadOnlyList<ConsolidationCandidate> candidates, CancellationToken ct = default)
+        public Task<ConsolidationResult> ConsolidateAsync(IReadOnlyList<ConsolidationCandidate> candidates, MergeLevel level, CancellationToken ct = default)
         {
             Batches.Add(candidates.Select(c => c.Title).ToList());
             if (FailCall(Batches.Count)) throw new ExtractionFailedException("boom");
@@ -41,8 +44,8 @@ public class ConsolidationBatcherTests
         }
     }
 
-    private static Task<BatchedConsolidation> Run(IReadOnlyList<ValidatedActionPoint> pts, FakeExtractor x) =>
-        ConsolidationBatcher.RunAsync(pts, x, NullLogger.Instance, CancellationToken.None);
+    private static Task<BatchedConsolidation> Run(IReadOnlyList<ValidatedActionPoint> pts, FakeExtractor x, MergeLevel level = MergeLevel.Medium) =>
+        ConsolidationBatcher.RunAsync(pts, x, NullLogger.Instance, CancellationToken.None, level);
 
     [Fact]
     public async Task ListThatFitsIsOneCallAsBefore()
@@ -154,5 +157,39 @@ public class ConsolidationBatcherTests
         Assert.Equal("p", r.Points[pair.A].Title);
         Assert.Equal("q", r.Points[pair.B].Title);
         Assert.Equal(9, r.Points.Count);
+    }
+
+    [Fact]
+    public async Task LowNeverMergesButFlagsWhatTheModelWouldHaveMerged()
+    {
+        var x = new FakeExtractor(budget: 100_000);
+        var r = await Run([Ap("a", 1), Ap("b", 2), Ap("a", 3)], x, MergeLevel.Low);
+
+        Assert.Equal(0, r.MergedCount);
+        Assert.Equal(3, r.Points.Count);
+        var pair = Assert.Single(r.PossiblePairs);
+        Assert.Equal(("a", "a"), (r.Points[pair.A].Title, r.Points[pair.B].Title));
+    }
+
+    [Fact]
+    public async Task MediumFlagsInsteadOfMergingWhenOwnersDiffer()
+    {
+        var x = new FakeExtractor(budget: 100_000);
+        var r = await Run([Owned("Send list", 1, "Grace"), Owned("Send list", 2, "Dan"), Owned("Send list", 3, "Grace Okafor")], x);
+
+        Assert.Equal(1, r.MergedCount);
+        Assert.Equal(2, r.Points.Count);
+        Assert.Single(r.PossiblePairs);
+    }
+
+    [Fact]
+    public async Task AggressiveMergesEvenWhenOwnersDiffer()
+    {
+        var x = new FakeExtractor(budget: 100_000);
+        var r = await Run([Owned("Send list", 1, "Grace"), Owned("Send list", 2, "Dan")], x, MergeLevel.Aggressive);
+
+        Assert.Equal(1, r.MergedCount);
+        Assert.Single(r.Points);
+        Assert.Empty(r.PossiblePairs);
     }
 }

@@ -44,6 +44,12 @@ public sealed class ExtractionFunctions(DistillForgeDbContext db, ExtractionRunn
             .Select(r => r.AiModelId)
             .FirstOrDefaultAsync(ct);
 
+        var mergeLevel = request?.MergeLevel ?? await db.ExtractionRuns.AsNoTracking()
+            .Where(r => r.WorkspaceId == id && r.MergeLevel != null)
+            .OrderByDescending(r => r.CreatedAt)
+            .Select(r => r.MergeLevel)
+            .FirstOrDefaultAsync(ct);
+
         var active = await db.ExtractionRuns.AsNoTracking()
             .Where(r => r.WorkspaceId == id && (r.Status == ExtractionRunStatus.Queued || r.Status == ExtractionRunStatus.Running))
             .OrderByDescending(r => r.CreatedAt)
@@ -60,6 +66,7 @@ public sealed class ExtractionFunctions(DistillForgeDbContext db, ExtractionRunn
             WorkspaceId = id,
             Status = ExtractionRunStatus.Queued,
             AiModelId = modelId,
+            MergeLevel = mergeLevel ?? MergeLevel.Medium,
             CreatedAt = DateTimeOffset.UtcNow,
         };
         db.ExtractionRuns.Add(run);

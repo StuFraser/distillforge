@@ -81,6 +81,13 @@
                         <option value="@m.Id">@m.Label</option>
                     }
                 </select>
+                <select class="model-picker" aria-label="Duplicate merging for extraction"
+                        title="How readily the consolidation pass merges duplicate notes. Low only flags them for you to review; Aggressive also merges differently-worded repeats."
+                        @bind="ChosenMergeLevel" disabled="@IsExtracting">
+                    <option value="@nameof(MergeLevel.Low)">Merging: low</option>
+                    <option value="@nameof(MergeLevel.Medium)">Merging: medium</option>
+                    <option value="@nameof(MergeLevel.Aggressive)">Merging: aggressive</option>
+                </select>
                 <button type="button" class="secondary" @onclick="ConfirmReextract" disabled="@IsExtracting">Re-extract</button>
             }
         </footer>
@@ -678,6 +685,14 @@
         set => _chosenModelId = Guid.TryParse(value, out var id) ? id : null;
     }
 
+    private MergeLevel _mergeLevel = MergeLevel.Medium;
+
+    private string ChosenMergeLevel
+    {
+        get => _mergeLevel.ToString();
+        set => _mergeLevel = Enum.TryParse<MergeLevel>(value, out var l) ? l : MergeLevel.Medium;
+    }
+
     private string DefaultModelLabel => _models.FirstOrDefault(m => m.IsDefault) is { } d ? $"Default: {d.Label}" : "Default (server config)";
 
     private async Task ReloadModels()
@@ -722,6 +737,7 @@
         _activeCategoryId = null;
         // Preselect the model this workspace last used (if it still exists).
         _chosenModelId = _run?.AiModelId is Guid last && _models.Any(m => m.Id == last) ? last : null;
+        _mergeLevel = _run?.MergeLevel ?? MergeLevel.Medium;
         ResetFilters();
         ClearSelection();
         // A run left in flight (e.g. page refreshed mid-extraction) is picked up again.
@@ -826,7 +842,7 @@
         try
         {
             _progressHidden = false;
-            _run = await Api.StartExtractionAsync(_workspace.Id, _chosenModelId, _cts.Token);
+            _run = await Api.StartExtractionAsync(_workspace.Id, _chosenModelId, _mergeLevel, _cts.Token);
             StateHasChanged();
             await PollRun();
         }

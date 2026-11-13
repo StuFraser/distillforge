@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using DistillForge.Api.Ai;
 using DistillForge.Api.Services;
 using DistillForge.Bench;
+using DistillForge.Core.Contracts;
 using DistillForge.Core.Extraction;
 using DistillForge.Core.Segmentation;
 using DistillForge.Core.Text;
@@ -84,7 +85,7 @@ try
         {
             stopAll.Token.ThrowIfCancellationRequested();
             Console.Write($"[{++n}/{total}] {doc.Name} · {model.Name}/{profile.Name}" + (repeats > 1 ? $" #{r}" : "") + " ... ");
-            var result = await RunOneAsync(doc.Name, doc.Segments, model.Name, profile.Name, r, extractor, config.RunTimeoutMinutes, stopAll.Token);
+            var result = await RunOneAsync(doc.Name, doc.Segments, model.Name, profile.Name, r, extractor, config.RunTimeoutMinutes, profile.MergeLevel, stopAll.Token);
             report.Runs.Add(result);
             Console.WriteLine(result.Succeeded
                 ? $"{result.Notes} notes, {result.Windows} window(s), {result.EvidenceSegment}/{result.EvidenceTotal} fallback quotes, {result.Seconds:F0}s"
@@ -106,7 +107,7 @@ Console.WriteLine($"\nWrote {jsonPath}\n      {csvPath}");
 return report.Runs.Any(r => !r.Succeeded) ? 1 : 0;
 
 static async Task<RunResult> RunOneAsync(string doc, IReadOnlyList<Segment> segments, string model, string profile, int repeat,
-    IActionExtractor extractor, int timeoutMinutes, CancellationToken stop)
+    IActionExtractor extractor, int timeoutMinutes, MergeLevel mergeLevel, CancellationToken stop)
 {
     var res = new RunResult { Document = doc, Model = model, Profile = profile, Repeat = repeat, Segments = segments.Count };
     var sw = Stopwatch.StartNew();
@@ -114,7 +115,7 @@ static async Task<RunResult> RunOneAsync(string doc, IReadOnlyList<Segment> segm
     cts.CancelAfter(TimeSpan.FromMinutes(timeoutMinutes));
     try
     {
-        var r = await ExtractionPipeline.RunAsync(segments, extractor, null, NullLogger.Instance, cts.Token);
+        var r = await ExtractionPipeline.RunAsync(segments, extractor, null, NullLogger.Instance, cts.Token, mergeLevel);
         var s = r.Stats;
         res.Succeeded = true;
         res.Windows = s.Windows; res.FailedWindows = s.FailedWindows; res.WindowBudgetTokens = s.WindowBudgetTokens;

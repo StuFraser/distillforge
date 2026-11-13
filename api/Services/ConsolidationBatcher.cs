@@ -1,4 +1,5 @@
 using DistillForge.Api.Ai;
+using DistillForge.Core.Contracts;
 using DistillForge.Core.Extraction;
 using Microsoft.Extensions.Logging;
 
@@ -29,7 +30,8 @@ public static class ConsolidationBatcher
     public const int MaxCandidatesPerBatch = 40;
 
     public static async Task<BatchedConsolidation> RunAsync(
-        IReadOnlyList<ValidatedActionPoint> points, IActionExtractor extractor, ILogger logger, CancellationToken ct)
+        IReadOnlyList<ValidatedActionPoint> points, IActionExtractor extractor, ILogger logger, CancellationToken ct,
+        MergeLevel level = MergeLevel.Medium)
     {
         var state = new State(points.ToList());
 
@@ -40,13 +42,13 @@ public static class ConsolidationBatcher
             return state.ToResult(skipped: true);
         }
 
-        await RoundAsync(state, firstRound, extractor, logger, ct);
+        await RoundAsync(state, firstRound, extractor, logger, ct, level);
 
         // Only needed when round 1 split the list; otherwise the single call already saw everything.
         if (firstRound.Count > 1 && state.Points.Count > 1)
         {
             var second = Partition(state.Points, extractor, firstLimit: Math.Max(2, firstRound[0].Count / 2));
-            await RoundAsync(state, second, extractor, logger, ct);
+            await RoundAsync(state, second, extractor, logger, ct, level);
         }
         return state.ToResult(skipped: false);
     }
@@ -74,7 +76,7 @@ public static class ConsolidationBatcher
     }
 
     private static async Task RoundAsync(State s, List<(int Start, int Count)> batches, IActionExtractor extractor,
-        ILogger logger, CancellationToken ct)
+        ILogger logger, CancellationToken ct, MergeLevel level)
     {
         var newPoints = new List<ValidatedActionPoint>();
         var oldToNew = new int[s.Points.Count];
@@ -93,10 +95,17 @@ public static class ConsolidationBatcher
                     if (extractor.EstimateConsolidationTokens(candidates) <= extractor.PromptBudgetTokens)
                     {
                         s.Calls++;
-                        var result = await extractor.ConsolidateAsync(candidates, ct);
-                        var outcome = ActionPointConsolidator.Apply(slice, result.Response);
-                        foreach (var (a, b) in ActionPointConsolidator.PossiblePairs(result.Response, outcome.FinalIndexOf))
+                        var result = await extractor.ConsolidateAsync(candidates, level, ct);
+                        var response = ActionPointConsolidator.ForLevel(result.Response, level);
+                        // Medium refuses to auto-merge notes with clearly different owners; those get flagged instead.
+                        var outcome = ActionPointConsolidator.Apply(slice, response, guardOwners: level == MergeLevel.Medium);
+                        foreach (var (a, b) in ActionPointConsolidator.PossiblePairs(response, outcome.FinalIndexOf))
                             newPairs.Add((baseIndex + a, baseIndex + b));
+                        foreach (var (a, b) in outcome.Blocked ?? [])
+                        {
+                            int x = outcome.FinalIndexOf[a], y = outcome.FinalIndexOf[b];
+                            if (x != y) newPairs.Add((baseIndex + Math.Min(x, y), baseIndex + Math.Max(x, y)));
+                        }
                         for (int i = 0; i < count; i++) oldToNew[start + i] = baseIndex + outcome.FinalIndexOf[i];
                         newPoints.AddRange(outcome.ActionPoints);
                         s.Merged += outcome.MergedCount;

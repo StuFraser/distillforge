@@ -54,14 +54,14 @@ public sealed class OpenAiCompatibleActionExtractor(
     public int EstimateConsolidationTokens(IReadOnlyList<ConsolidationCandidate> candidates) =>
         ConsolidationPrompt.EstimateTokens(candidates);
 
-    public async Task<ConsolidationResult> ConsolidateAsync(IReadOnlyList<ConsolidationCandidate> candidates, CancellationToken cancellationToken = default)
+    public async Task<ConsolidationResult> ConsolidateAsync(IReadOnlyList<ConsolidationCandidate> candidates, MergeLevel level, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_opt.BaseUrl) || string.IsNullOrWhiteSpace(_opt.Model))
             throw new ExtractionFailedException("The AI provider has no base URL or model configured.");
 
         var messages = new JsonArray
         {
-            new JsonObject { ["role"] = "system", ["content"] = ConsolidationPrompt.System },
+            new JsonObject { ["role"] = "system", ["content"] = ConsolidationPrompt.SystemFor(level) },
             new JsonObject { ["role"] = "user", ["content"] = ConsolidationPrompt.BuildUserMessage(candidates) },
         };
 

@@ -1,3 +1,4 @@
+using DistillForge.Core.Contracts;
 using DistillForge.Core.Segmentation;
 
 namespace DistillForge.Core.Extraction;
@@ -19,7 +20,7 @@ public interface IActionExtractor
     /// Pass 2: asks the model which candidates (from different windows) describe the same task.
     /// Candidates must fit <see cref="PromptBudgetTokens"/>; see <see cref="EstimateConsolidationTokens"/>.
     /// </summary>
-    Task<ConsolidationResult> ConsolidateAsync(IReadOnlyList<ConsolidationCandidate> candidates, CancellationToken cancellationToken = default);
+    Task<ConsolidationResult> ConsolidateAsync(IReadOnlyList<ConsolidationCandidate> candidates, MergeLevel level, CancellationToken cancellationToken = default);
 
     int EstimateConsolidationTokens(IReadOnlyList<ConsolidationCandidate> candidates);
 }

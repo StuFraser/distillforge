@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DistillForge.Core.Contracts;
 using DistillForge.Core.Extraction;
 
 namespace DistillForge.Core.Tests;
@@ -60,5 +61,43 @@ public class ActionPointConsolidatorTests
         var outcome = ActionPointConsolidator.Apply(Points, new ConsolidationResponse());
         Assert.Equal(0, outcome.MergedCount);
         Assert.Equal(3, outcome.ActionPoints.Count);
+    }
+
+    [Fact]
+    public void LowLevelTurnsEveryMergeIntoAPossibleGroup()
+    {
+        var response = Parse("""{"merges":[{"keep":"c1","duplicates":["c2","c3"]}],"possible":[{"ids":["c2","c3"]}]}""");
+        var low = ActionPointConsolidator.ForLevel(response, MergeLevel.Low);
+
+        Assert.Empty(low.Merges);
+        Assert.Equal(2, low.Possible.Count);
+        Assert.Equal(["c1", "c2", "c3"], low.Possible[1].Ids);
+        Assert.Same(response, ActionPointConsolidator.ForLevel(response, MergeLevel.Medium));
+        Assert.Same(response, ActionPointConsolidator.ForLevel(response, MergeLevel.Aggressive));
+    }
+
+    [Theory]
+    [InlineData(null, "Grace", true)]
+    [InlineData("Grace", "", true)]
+    [InlineData("Grace", "Grace Okafor", true)]
+    [InlineData("grace okafor", "GRACE", true)]
+    [InlineData("Grace", "Dan", false)]
+    public void OwnerCompatibility(string? a, string? b, bool expected) =>
+        Assert.Equal(expected, ActionPointConsolidator.OwnersCompatible(a, b));
+
+    [Fact]
+    public void OwnerGuardRefusesMergeAndReportsItBlocked()
+    {
+        IReadOnlyList<ValidatedActionPoint> pts = [Ap("Send list", 1, owner: "Grace"), Ap("Send the list", 2, owner: "Dan"), Ap("Send list again", 3, owner: "Grace Okafor")];
+        var response = Parse("""{"merges":[{"keep":"c1","duplicates":["c2","c3"]}]}""");
+
+        var guarded = ActionPointConsolidator.Apply(pts, response, guardOwners: true);
+        Assert.Equal(1, guarded.MergedCount);          // c3 (same person) merged, c2 (Dan) not
+        Assert.Equal(2, guarded.ActionPoints.Count);
+        Assert.Equal([(0, 1)], guarded.Blocked);
+
+        var open = ActionPointConsolidator.Apply(pts, response);
+        Assert.Equal(2, open.MergedCount);
+        Assert.Single(open.ActionPoints);
     }
 }

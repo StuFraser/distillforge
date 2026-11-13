@@ -12,6 +12,8 @@ cp tools/DistillForge.Bench/bench.sample.json tools/DistillForge.Bench/bench.jso
 dotnet run --project tools/DistillForge.Bench -- --config tools/DistillForge.Bench/bench.json
 ```
 
+A profile can also set `"mergeLevel": "Low" | "Medium" | "Aggressive"` (default Medium), e.g. to compare merge levels at one window size.
+
 Handy options: `--docs 01,04` (name prefixes), `--models`, `--profiles`, `--max-docs 2` (first 2 documents only; smoke test),
 `--runs 3` (repeats, shows spread), `--baseline bench-results/bench-<earlier>.json` (note-count deltas). `--help` lists all.
 

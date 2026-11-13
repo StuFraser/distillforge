@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using DistillForge.Core.Contracts;
 using DistillForge.Core.Extraction;
 using DistillForge.Core.Text;
 
@@ -31,6 +32,26 @@ public static class ConsolidationPrompt
         {"merges":[{"keep":"c3","duplicates":["c7","c9"]}],"possible":[{"ids":["c2","c11"]}]}
         Use an empty list for either key when nothing applies.
         """;
+
+    /// <summary>Low: the model must not merge, only flag. Aggressive: also merge the same outcome worded differently.</summary>
+    public static string SystemFor(MergeLevel level) => level switch
+    {
+        MergeLevel.Low => System + """
+
+
+            IMPORTANT: do NOT merge anything. Leave "merges" empty. Put every group of candidates you think are the same task
+            in "possible", so a person can decide.
+            """,
+        MergeLevel.Aggressive => System + """
+
+
+            Be generous when merging. Treat candidates as the same task when they ask for the same outcome from the same
+            person or team, even if the wording differs, the task is split into steps, or it is mentioned once in discussion and
+            again in a recap or summary. Different people, or different deliverables, stay separate. When unsure between
+            "merges" and "possible", prefer "merges".
+            """,
+        _ => System,
+    };
 
     public static string BuildUserMessage(IReadOnlyList<ConsolidationCandidate> candidates)
     {

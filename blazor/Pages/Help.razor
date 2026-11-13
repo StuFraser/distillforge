@@ -49,8 +49,18 @@
                     The app finds those quotes in your document itself, so the highlight is exact and the model can't invent locations.</li>
                 <li><strong>Pass 2 · Consolidating</strong>: when there was more than one window, the model is asked which notes describe the same task.
                     Clear repeats are merged. It can only suggest merges; the app does the merging, so evidence is never lost or rewritten.
-                    Notes that <em>might</em> be the same task are not merged but flagged for you (see <a href="help#duplicates">Duplicates and merging</a>).</li>
+                    Notes that <em>might</em> be the same task are not merged but flagged for you (see <a href="help#duplicates">Duplicates and merging</a>).
+                    A long list is checked in several smaller batches, so small windows still get a duplicate check.</li>
                 <li>A window that fails is skipped with a warning rather than failing the whole run. Hover the status line above the notes to see warnings.</li>
+            </ul>
+            <p>
+                <strong>Merging</strong> (next to the model dropdown) sets how readily pass 2 merges duplicates:
+            </p>
+            <ul>
+                <li><strong>Low</strong>: nothing is merged automatically. Anything the model thinks is a repeat is flagged ⚠ for you to review. Safest, but expect more flags.</li>
+                <li><strong>Medium</strong> (default): clear repeats are merged and uncertain ones are flagged. Two notes with clearly different owners are flagged, not merged.</li>
+                <li><strong>Aggressive</strong>: also merges notes that ask for the same outcome from the same person even when they're worded differently or mentioned once in discussion and again in a recap.
+                    Fewer repeats, but a higher chance that two genuinely separate tasks get merged. You can unmerge anything it merged.</li>
             </ul>
             <p>
                 <strong>Cancel extraction</strong> stops the run within a few seconds. Your existing notes are not changed: new notes are only saved when a run finishes.
@@ -251,7 +261,7 @@
             <p><strong>Tips</strong></p>
             <ul>
                 <li>Don't go too small: very small windows chop up context and can produce fragments. Windows of a few thousand tokens are usually a sensible floor.</li>
-                <li>Check the status line for <em>"Consolidation skipped"</em>. With many notes and a small window, the list can be too big to send for the duplicate check, so scan the results for repeats yourself.</li>
+                <li>Small windows produce many notes and a lot of repeats. Consolidation runs in batches, but it can only compare notes inside the same batch, so repeats from far apart in the document (a point raised early and again in a recap) can survive. Look for the ⚠ flags and scan for repeats yourself, or raise the Merging level.</li>
                 <li>Never set the context window higher than the server really runs the model with; text beyond it is silently cut off (see the table above). The app adds a warning to the run when the reported prompt size looks far below what it sent. Hover the status line to read it.</li>
                 <li>Different models behave differently. It's worth trying the same document on two or three, using the model dropdown.</li>
                 <li>Telling the document type apart (<em>Transcript</em> or <em>Prose</em>) when you add it can help the app split the text sensibly. Auto-detect is usually right.</li>
@@ -283,7 +293,7 @@
                 <dd>Try smaller windows (see above), a stronger model, or check for failed windows in the warnings.</dd>
 
                 <dt>Duplicate or near-identical notes</dt>
-                <dd>Common with very small windows, especially if consolidation was skipped (see the status line). Look for the ⚠ flag and merge them (see
+                <dd>Common with very small windows, or with Merging set to Low. Look for the ⚠ flag and merge them (see
                     <a href="help#duplicates">Duplicates and merging</a>), or re-extract with slightly larger windows.</dd>
 
                 <dt>A note's highlight is a whole passage, not a phrase</dt>

@@ -31,7 +31,7 @@ public static class Mapping
 
     public static ExtractionRunDto ToDto(this ExtractionRun r) => new(
         r.Id, r.WorkspaceId, r.Status, r.Model, r.PromptTokens, r.CompletionTokens, r.ActionItemCount,
-        r.Error, r.Warnings, r.CreatedAt, r.CompletedAt, r.Phase, r.WindowIndex, r.WindowCount, r.AiModelId);
+        r.Error, r.Warnings, r.CreatedAt, r.CompletedAt, r.Phase, r.WindowIndex, r.WindowCount, r.AiModelId, r.MergeLevel);
 
     /// <summary>Rebuilds core segments (with text) from stored boundaries and the canonical source.</summary>
     public static IReadOnlyList<CoreSegment> ToCoreSegments(this Workspace w) =>

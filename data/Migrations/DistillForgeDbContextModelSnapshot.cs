@@ -291,6 +291,10 @@ namespace DistillForge.Data.Migrations
                     b.Property<DateTimeOffset?>("HeartbeatAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("MergeLevel")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<string>("Model")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");

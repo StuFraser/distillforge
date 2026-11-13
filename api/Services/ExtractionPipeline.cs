@@ -42,7 +42,8 @@ public static class ExtractionPipeline
         IActionExtractor extractor,
         Func<ExtractionPhase, int, int, Task>? progress,
         ILogger logger,
-        CancellationToken ct)
+        CancellationToken ct,
+        MergeLevel mergeLevel = MergeLevel.Medium)
     {
         int windowBudget = extractor.PromptBudgetTokens - ExtractionPrompt.FixedOverhead;
         if (windowBudget <= 0)
@@ -105,7 +106,7 @@ public static class ExtractionPipeline
         if (windows.Count > 1 && merged.Count > 1)
         {
             if (progress is not null) await progress(ExtractionPhase.Consolidating, windows.Count, windows.Count);
-            var batched = await ConsolidationBatcher.RunAsync(merged, extractor, logger, ct);
+            var batched = await ConsolidationBatcher.RunAsync(merged, extractor, logger, ct, mergeLevel);
             consolidationCalls = batched.Calls;
             skipped = batched.Skipped;
             ran = batched.Calls > 0;

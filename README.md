@@ -104,7 +104,10 @@ once in a document (a request, then a later confirmation).
 
 - **Automatic:** repeats from the same passage are merged in code, and the model's
   "exactly the same task" suggestions in the consolidation pass are applied. The model only
-  suggests; code does the merging, so evidence is never rewritten.
+  suggests; code does the merging, so evidence is never rewritten. A **Merging** setting
+  (low / medium / aggressive, next to the model dropdown) controls how readily it merges:
+  low only flags, medium merges clear repeats (and won't merge notes with clearly different
+  owners), aggressive also merges differently-worded repeats. Long lists are consolidated in batches.
 - **Flagged:** the consolidation pass also lists notes that *might* be the same task, and a
   whole-document title comparison adds more. These show a ⚠ and are never merged
   automatically.
@@ -242,8 +245,8 @@ when tuning prompts and checking how faithfully quotes are copied.
 2. ✅ (mostly) **Large documents:** token-budgeted windows with overlap, de-duplication in
    code plus a model consolidation pass, cancel and timeout handling, a benchmark harness
    (`tools/DistillForge.Bench`). Still to do: fuzzy quote matching (about 5% of quotes fall back
-   to whole-segment highlighting in testing), batching the consolidation pass so small windows
-   don't skip it
+   to whole-segment highlighting in testing). Consolidation is now batched so small windows
+   don't skip it, but it only compares notes within a batch (position order)
 3. **Categories** ✅ (add/rename/delete, drag and drop), **bring-your-own AI settings** ✅,
    **duplicate flags and merging** ✅, in-app **Help** ✅, **manual notes** ✅,
    **deleting notes** ✅

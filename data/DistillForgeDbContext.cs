@@ -65,6 +65,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.Model).HasMaxLength(200);
             e.Property(x => x.Phase).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.MergeLevel).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.FinishReason).HasMaxLength(32);
             // Deleting a model keeps the run (and its Model string) but forgets which config produced it.
             e.HasOne<AiModel>().WithMany().HasForeignKey(x => x.AiModelId).OnDelete(DeleteBehavior.SetNull);

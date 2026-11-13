@@ -22,6 +22,7 @@
   "profiles": [
     { "name": "2k", "contextTokens": 2048, "reserveOutput": 1024 },
     { "name": "4k", "contextTokens": 4096, "reserveOutput": 2048 },
-    { "name": "8k", "contextTokens": 8192, "reserveOutput": 2048 }
+    { "name": "8k", "contextTokens": 8192, "reserveOutput": 2048 },
+    { "name": "4k-aggressive", "contextTokens": 4096, "reserveOutput": 2048, "mergeLevel": "Aggressive" }
   ]
 }

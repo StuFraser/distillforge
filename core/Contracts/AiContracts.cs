@@ -52,8 +52,8 @@ public sealed record DiscoverModelsResponse(bool Ok, IReadOnlyList<string> Model
 /// <summary>An entry in the "which model should run this extraction" dropdown.</summary>
 public sealed record AiModelChoiceDto(Guid Id, string Label, bool IsDefault);
 
-/// <summary>Body of POST /workspaces/{id}/extract. A null AiModelId means "use the workspace's last model, else the default".</summary>
-public sealed record StartExtractionRequest(Guid? AiModelId);
+/// <summary>Body of POST /workspaces/{id}/extract. A null AiModelId means "use the workspace's last model, else the default"; a null MergeLevel means the last run's level, else Medium.</summary>
+public sealed record StartExtractionRequest(Guid? AiModelId, MergeLevel? MergeLevel = null);
 
 public static class AiValidation
 {

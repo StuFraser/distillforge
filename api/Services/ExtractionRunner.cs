@@ -67,7 +67,7 @@ public sealed class ExtractionRunner(
             var result = await ExtractionPipeline.RunAsync(
                 segments, extractor,
                 (phase, index, count) => ReportProgress(run, phase, index, count, ct),
-                logger, ct);
+                logger, ct, run.MergeLevel ?? MergeLevel.Medium);
             run.EstimatedPromptTokens = result.Stats.EstimatedPromptTokens;
             var merged = result.ActionPoints;
             var aiPossible = result.AiPossible;

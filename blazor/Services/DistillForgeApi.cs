@@ -121,9 +121,9 @@ public sealed class DistillForgeApi(HttpClient http)
         ?? throw new ApiException("That note no longer exists.");
 
     /// <summary>Starts a run (202), or returns the run already in progress (409). A null model means the server picks (last used, else default).</summary>
-    public async Task<ExtractionRunDto> StartExtractionAsync(Guid workspaceId, Guid? aiModelId = null, CancellationToken ct = default)
+    public async Task<ExtractionRunDto> StartExtractionAsync(Guid workspaceId, Guid? aiModelId = null, MergeLevel? mergeLevel = null, CancellationToken ct = default)
     {
-        using var response = await http.PostAsJsonAsync($"workspaces/{workspaceId}/extract", new StartExtractionRequest(aiModelId), ct);
+        using var response = await http.PostAsJsonAsync($"workspaces/{workspaceId}/extract", new StartExtractionRequest(aiModelId, mergeLevel), ct);
         if (response.StatusCode is HttpStatusCode.Accepted or HttpStatusCode.Conflict)
             return (await response.Content.ReadFromJsonAsync<ExtractionRunDto>(ct))!;
         throw await ToException(response, ct);

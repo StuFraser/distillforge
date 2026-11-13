@@ -104,6 +104,9 @@ public class ExtractionRun
     /// <summary>The model the run was asked to use. Null once that model is deleted (the Model string keeps the history) or when the default/config fallback was used.</summary>
     public Guid? AiModelId { get; set; }
 
+    /// <summary>How aggressively pass 2 merges duplicates. Null (older runs) means Medium.</summary>
+    public MergeLevel? MergeLevel { get; set; }
+
     public ExtractionPhase? Phase { get; set; }
     public int? WindowIndex { get; set; }
     public int? WindowCount { get; set; }

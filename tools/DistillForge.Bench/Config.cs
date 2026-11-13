@@ -51,4 +51,6 @@ public sealed class ProfileEntry
     public string Name { get; set; } = "";
     public int ContextTokens { get; set; } = 8192;
     public int ReserveOutput { get; set; } = 2048;
+    /// <summary>Low, Medium (default) or Aggressive; see the Merging setting in the app.</summary>
+    public MergeLevel MergeLevel { get; set; } = MergeLevel.Medium;
 }
