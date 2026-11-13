@@ -179,11 +179,15 @@
             </p>
             <p class="formula">Space for document text in each window ≈ (context window − reserved output) × 90%, less the instructions sent with it.</p>
 
-            <h3>Smaller windows often find more</h3>
+            <h3>More windows means more notes, not always better notes</h3>
             <p>
                 A model tends to return a limited number of items per answer, however long the text. Giving it a long document in one go can mean it picks out only the most
                 prominent points. Splitting the same document into more, smaller windows gives it a closer read of each part, and usually surfaces more of the quieter commitments.
-                The trade-offs:
+            </p>
+            <p>
+                But more is not automatically better. In our own testing with local 8B models, the number of notes rose roughly in step with the number of windows, not with how much
+                there was to find: the same short email gave about 5 notes in one window and about 20 in five small ones, and many of the extra notes were fragments or near-duplicates of each other.
+                Small windows also make the duplicate check harder (see below). The trade-offs:
             </p>
             <table class="help-table">
                 <thead><tr><th></th><th>Larger windows</th><th>Smaller windows</th></tr></thead>
@@ -194,6 +198,31 @@
                     <tr><th>Duplicates</th><td>Little to merge</td><td>Relies on the consolidation pass</td></tr>
                 </tbody>
             </table>
+
+            <h3>Setting the context window and reserved output</h3>
+            <p>Both numbers need to describe what the server <em>really</em> runs the model with. Getting them wrong in either direction causes problems:</p>
+            <table class="help-table">
+                <thead><tr><th></th><th>Set too high</th><th>Set too low</th></tr></thead>
+                <tbody>
+                    <tr><th>Context window</th>
+                        <td>The server silently cuts off the end of each window, so the model answers from part of the text. You get fewer notes than expected, notes dropped for having <em>no valid evidence</em>, and a warning that the reported prompt size is far below what was sent. Nothing fails outright, so it is easy to miss.</td>
+                        <td>Many small windows: more fragments and near-duplicates, slower and more tokens, and the duplicate check may be skipped because its list no longer fits.</td></tr>
+                    <tr><th>Reserved output</th>
+                        <td>Less room for document text in each window, so more windows than you need.</td>
+                        <td>The model runs out of room mid-answer and the window fails with <em>"Response was truncated"</em>. In testing this was the most common cause of failed windows with small settings, because a window with a lot to report needs a lot of output.</td></tr>
+                </tbody>
+            </table>
+            <p>
+                The prompt <em>and</em> the answer have to fit in the context window together, so a reserved output that looks generous (say half the window) on a small context is often the right call.
+                For a local model, a safe starting point is a context of <strong>4096</strong> with <strong>2048</strong> reserved, then raise both together once you have confirmed the server accepts the larger size.
+            </p>
+            <p><strong>Local servers (Ollama and similar)</strong></p>
+            <ul>
+                <li>The context window the server runs with is set on the server, not by this app. Changing it usually needs the server (or the loaded model) to be restarted before it takes effect, so a setting you changed may not be live yet.</li>
+                <li>Ollama's OpenAI-compatible endpoint can't change the context per request. Set it for the server, or create a model with a larger <code>num_ctx</code> in its Modelfile and add that model here.</li>
+                <li>On Ollama, <code>ollama ps</code> shows the context length a loaded model is actually using.</li>
+                <li>If a run's warnings say <em>"Prompt tokens reported … are far below the estimate"</em>, treat that run's results as unreliable: the server cut the input. Fix the server setting (or lower the app's context window to match) and re-extract.</li>
+            </ul>
 
             <h3>Try it yourself</h3>
             <ol>
@@ -206,7 +235,7 @@
             <ul>
                 <li>Don't go too small: very small windows chop up context and can produce fragments. Windows of a few thousand tokens are usually a sensible floor.</li>
                 <li>Check the status line for <em>"Consolidation skipped"</em>. With many notes and a small window, the list can be too big to send for the duplicate check, so scan the results for repeats yourself.</li>
-                <li>Never set the context window higher than the server really runs the model with; text beyond it is silently cut off. The app warns when reported prompt size looks far below what it sent.</li>
+                <li>Never set the context window higher than the server really runs the model with; text beyond it is silently cut off (see the table above). The app adds a warning to the run when the reported prompt size looks far below what it sent. Hover the status line to read it.</li>
                 <li>Different models behave differently. It's worth trying the same document on two or three, using the model dropdown.</li>
                 <li>Telling the document type apart (<em>Transcript</em> or <em>Prose</em>) when you add it can help the app split the text sensibly. Auto-detect is usually right.</li>
             </ul>
