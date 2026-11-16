@@ -1,0 +1,45 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@inject AuthSettingsHolder Auth
+@inject NavigationManager Navigation
+
+@if (!Auth.Settings.IsEnabled)
+{
+    <span class="avatar dev" title="Dev mode: no sign-in (the API is in Auth__Mode=Dev)">DEV</span>
+}
+else
+{
+    <AuthorizeView>
+        <Authorized>
+            <div class="account">
+                <button type="button" class="avatar" title="@context.User.Identity?.Name" aria-label="Account menu" aria-haspopup="true" aria-expanded="@_open.ToString().ToLowerInvariant()"
+                        @onclick="() => _open = !_open">@Initials(context.User.Identity?.Name)</button>
+                @if (_open)
+                {
+                    <div class="account-backdrop" @onclick="() => _open = false"></div>
+                    <div class="account-menu" role="menu">
+                        <div class="account-name">@(context.User.Identity?.Name ?? "Signed in")</div>
+                        <button type="button" role="menuitem" @onclick="SignOut">Sign out</button>
+                    </div>
+                }
+            </div>
+        </Authorized>
+        <NotAuthorized>
+            <button type="button" class="primary" @onclick="SignIn">Sign in</button>
+        </NotAuthorized>
+    </AuthorizeView>
+}
+
+@code {
+    private bool _open;
+
+    private void SignIn() => Navigation.NavigateToLogin("authentication/login");
+
+    private void SignOut() => Navigation.NavigateToLogout("authentication/logout", "/");
+
+    private static string Initials(string? name)
+    {
+        var parts = (name ?? "").Split([' ', '.', '@'], StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch { 0 => "?", 1 => parts[0][..1].ToUpperInvariant(), _ => (parts[0][..1] + parts[^1][..1]).ToUpperInvariant() };
+    }
+}

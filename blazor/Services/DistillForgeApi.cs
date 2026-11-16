@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 using DistillForge.Core.Contracts;
 
 namespace DistillForge.Blazor.Services;
@@ -141,6 +142,12 @@ public sealed class DistillForgeApi(HttpClient http)
         HttpResponseMessage response;
         try { response = await call(); }
         catch (HttpRequestException ex) { throw new ApiException($"Could not reach the API ({ex.Message}). Is `func start` running?"); }
+        catch (AccessTokenNotAvailableException ex)
+        {
+            // The session ran out and a token can't be refreshed silently: go and sign in again.
+            ex.Redirect();
+            throw new ApiException("Your session has ended. Redirecting to sign in...");
+        }
 
         using (response)
         {
@@ -152,6 +159,8 @@ public sealed class DistillForgeApi(HttpClient http)
 
     private static async Task<ApiException> ToException(HttpResponseMessage response, CancellationToken ct)
     {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            return new ApiException("The API did not accept your sign-in (401). Sign out and back in; if that doesn't help, check the tenant and client settings on both sides.");
         var body = await response.Content.ReadAsStringAsync(ct);
         return new ApiException($"API error {(int)response.StatusCode}: {(string.IsNullOrWhiteSpace(body) ? response.ReasonPhrase : body.Trim('"'))}");
     }

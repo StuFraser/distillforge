@@ -125,7 +125,14 @@ main { flex: 1; min-height: 0; padding: 16px; }
 .icon-button { width: 36px; height: 36px; border-radius: 50%; border: 1px solid transparent; background: transparent; color: var(--muted); font-size: 1.1rem; cursor: pointer; }
 .icon-button:hover:not(:disabled) { background: var(--bg); }
 .icon-button:disabled { opacity: 0.45; cursor: not-allowed; }
-.avatar { width: 32px; height: 32px; margin-left: 6px; border-radius: 50%; background: #d1d5db; color: transparent; display: inline-flex; }
+.avatar { width: 32px; height: 32px; margin-left: 6px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.avatar.dev { background: #d1d5db; color: var(--muted); font-size: 0.6rem; letter-spacing: 0.04em; cursor: default; }
+.account { position: relative; }
+.account-backdrop { position: fixed; inset: 0; z-index: 40; }
+.account-menu { position: absolute; right: 0; top: 40px; z-index: 41; min-width: 200px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.account-name { padding: 8px 10px; font-size: 0.85rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-menu button { text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 6px; font: inherit; cursor: pointer; }
+.account-menu button:hover { background: var(--bg); }
 
 .workspace { height: 100%; display: grid; grid-template-columns: minmax(300px, 2fr) 3fr; gap: 16px; }
 .right-column { display: grid; grid-template-rows: 3fr 2fr; gap: 16px; min-height: 0; }

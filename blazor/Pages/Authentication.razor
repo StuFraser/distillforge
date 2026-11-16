@@ -1,0 +1,21 @@
+@page "/authentication/{action}"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@attribute [AllowAnonymous]
+@inject AuthSettingsHolder Auth
+@inject NavigationManager Navigation
+
+@if (Auth.Settings.IsEnabled)
+{
+    <RemoteAuthenticatorView Action="@Action" />
+}
+
+@code {
+    [Parameter] public string? Action { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // Dev mode has no sign-in; these routes only exist for real Entra sign-in.
+        if (!Auth.Settings.IsEnabled) Navigation.NavigateTo("", replace: true);
+    }
+}
