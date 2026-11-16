@@ -170,6 +170,9 @@ configure providers in the app instead (⚙ in the top bar).
 |---------|---------|-------|
 | `ConnectionStrings__Postgres` | `Host=db;Database=distillforge;Username=…;Password=…` | |
 | `AzureWebJobsStorage` | `UseDevelopmentStorage=true` | Azurite |
+| `Auth__Mode` | `Dev` | `Dev` = fake user, no sign-in (Development only). Leave unset (Entra) once the app registrations exist; see `design-notes/entraId_provisioning.md` |
+| `Auth__TenantId`, `Auth__ClientId` | *(GUIDs)* | Entra mode only: your tenant and the API app registration. `Auth__Audience` is an optional extra accepted audience |
+| `Auth__ClaimOrphanedData` | `true` / `false` | One-off: the first *new* user to sign in takes over rows created before auth existed (otherwise they are invisible to everyone). Turn on for that first sign-in, then off |
 | `Encryption__Key` | *(32 random bytes, base64)* | `openssl rand -base64 32`. Needed to store API keys; back it up, as losing it makes stored keys unreadable |
 | `AiProvider__BaseUrl` | `http://mini.lan:11434/v1` | **Fallback only**, used when no model is configured in the app. Include the `/v1` |
 | `AiProvider__Model` | `llama3.1:8b` | Fallback |
@@ -203,8 +206,10 @@ The front end finds the API through `blazor/wwwroot/appsettings.json` (`ApiBaseU
 
 ## API
 
-Endpoints are anonymous until Entra ID sign-in is added, so run it on a trusted network only.
-Everything is under `/api`.
+Every endpoint requires sign-in: a valid Entra ID access token for your single tenant (scope `access_as_user`), otherwise 401.
+All data (workspaces, notes, AI providers) belongs to the signed-in user; other users' data returns 404. For local work without
+Entra, set `Auth__Mode=Dev` (a fixed fake user, no tokens; the API refuses to start with it outside Development).
+The Blazor sign-in is not wired up yet, so until then run the API in Dev mode. Everything is under `/api`.
 
 | Area | Routes |
 |------|--------|
@@ -252,7 +257,8 @@ when tuning prompts and checking how faithfully quotes are copied.
    **deleting notes** ✅
 4. ✅ **File upload:** txt, md, PDF (text only, no OCR), docx. Tables and multi-column PDFs
    are not yet checked closely
-5. Entra ID sign-in (API security), per-user data and AI provider settings
+5. Entra ID sign-in (API security), per-user data and AI provider settings: 🚧 API side done
+   (token validation, per-user data, dev user); Blazor sign-in, SSRF guard and per-user limits still to do
 6. Export per category: ✅ **email** (preview, then open in your mail program or copy; no credentials).
    Next: GitHub Issues, then DevOps, Jira and others, behind one shared interface. These need saved
    credentials, so they follow Entra ID

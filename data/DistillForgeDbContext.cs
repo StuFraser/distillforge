@@ -5,6 +5,7 @@ namespace DistillForge.Data;
 
 public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> options) : DbContext(options)
 {
+    public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<Workspace> Workspaces => Set<Workspace>();
     public DbSet<Segment> Segments => Set<Segment>();
     public DbSet<Category> Categories => Set<Category>();
@@ -15,13 +16,67 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
     public DbSet<AiProvider> AiProviders => Set<AiProvider>();
     public DbSet<AiModel> AiModels => Set<AiModel>();
 
+    /// <summary>
+    /// The signed-in user this context acts for. Set once per request by the auth middleware (or by the queue runner, to the
+    /// run's owner). Every owned entity has a global query filter on it, so with no user set nothing is visible (default-deny),
+    /// and another user's rows simply don't exist as far as queries are concerned. Use <c>IgnoreQueryFilters()</c> deliberately.
+    /// </summary>
+    public Guid? CurrentUserId { get; set; }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        StampOwners();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        StampOwners();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>New workspaces, providers and models belong to the current user. Refuses to save them with no user rather than create ownerless rows.</summary>
+    private void StampOwners()
+    {
+        foreach (var entry in ChangeTracker.Entries().Where(e => e.State == EntityState.Added))
+        {
+            if (entry.Entity is not (Workspace or AiProvider or AiModel)) continue;
+            var owner = entry.Property("OwnerId");
+            if (owner.CurrentValue is not null) continue;
+            owner.CurrentValue = CurrentUserId
+                ?? throw new InvalidOperationException($"Cannot create a {entry.Metadata.ClrType.Name} without a signed-in user.");
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<AppUser>(e =>
+        {
+            e.Property(x => x.TenantId).HasMaxLength(64);
+            e.Property(x => x.ObjectId).HasMaxLength(64);
+            e.Property(x => x.DisplayName).HasMaxLength(200);
+            e.HasIndex(x => new { x.TenantId, x.ObjectId }).IsUnique();
+        });
+
+        // Ownership. Roots filter on their own OwnerId; children follow their workspace. The `CurrentUserId != null` guard matters:
+        // without it a null user would match ownerless rows (OwnerId IS NULL).
+        b.Entity<Workspace>().HasQueryFilter(w => CurrentUserId != null && w.OwnerId == CurrentUserId);
+        b.Entity<AiProvider>().HasQueryFilter(p => CurrentUserId != null && p.OwnerId == CurrentUserId);
+        b.Entity<AiModel>().HasQueryFilter(m => CurrentUserId != null && m.OwnerId == CurrentUserId);
+        b.Entity<Segment>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
+        b.Entity<Category>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
+        b.Entity<ActionItem>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
+        b.Entity<Evidence>().HasQueryFilter(x => CurrentUserId != null && x.ActionItem!.Workspace!.OwnerId == CurrentUserId);
+        b.Entity<ExtractionRun>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
+        b.Entity<ActionItemLink>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
+
         b.Entity<Workspace>(e =>
         {
             e.Property(x => x.Title).HasMaxLength(200);
             e.Property(x => x.Strategy).HasConversion<string>().HasMaxLength(32);
             e.HasIndex(x => x.IsArchived);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.OwnerId);
         });
 
         b.Entity<Segment>(e =>
@@ -75,7 +130,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
         b.Entity<ActionItemLink>(e =>
         {
             e.Property(x => x.Source).HasConversion<string>().HasMaxLength(16);
-            e.HasOne<Workspace>().WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Workspace).WithMany().HasForeignKey(x => x.WorkspaceId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<ActionItem>().WithMany().HasForeignKey(x => x.ActionItemAId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<ActionItem>().WithMany().HasForeignKey(x => x.ActionItemBId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.ActionItemAId, x.ActionItemBId }).IsUnique();
@@ -87,6 +142,8 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             e.Property(x => x.Name).HasMaxLength(100);
             e.Property(x => x.BaseUrl).HasMaxLength(500);
             e.Property(x => x.ApiKeyEncrypted).HasMaxLength(4000);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.OwnerId);
         });
 
         b.Entity<AiModel>(e =>
@@ -96,7 +153,9 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             e.Property(x => x.ResponseFormat).HasConversion<string>().HasMaxLength(16);
             e.HasOne(x => x.Provider).WithMany(p => p.Models).HasForeignKey(x => x.AiProviderId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.AiProviderId, x.ModelId }).IsUnique();
-            e.HasIndex(x => x.IsDefault).IsUnique().HasFilter("\"IsDefault\" = true");
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+            // One default model per user.
+            e.HasIndex(x => x.OwnerId).IsUnique().HasFilter("\"IsDefault\" = true");
         });
     }
 }

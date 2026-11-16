@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DistillForge.Api.Functions;
 
-// AuthorizationLevel.Anonymous until Entra ID is wired up (milestone 5): until then anyone who can reach
-// the API can USE stored providers (keys are never returned, but tokens are spendable). Gate before deploying.
+// Providers and models belong to the signed-in user (query filters); see AuthMiddleware. Still to do before hosting: the SSRF guard
+// on /ai/discover and extraction URLs (block loopback/private/metadata addresses), and per-user caps.
 public sealed class AiProviderFunctions(DistillForgeDbContext db, SecretProtector secrets, IHttpClientFactory httpFactory)
 {
     [Function("ListAiProviders")]

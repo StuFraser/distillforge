@@ -8,7 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DistillForge.Api.Functions;
 
-// AuthorizationLevel.Anonymous until Entra ID is wired up (milestone 5).
+// AuthorizationLevel.Anonymous only means "no function key": every HTTP function is gated by AuthMiddleware (Entra ID token, or the
+// fake user in Auth__Mode=Dev), and all data is scoped to the signed-in user by the DbContext's query filters.
 public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceService workspaces, SourceFileExtractor sourceFiles)
 {
     [Function("ExtractSourceFile")]

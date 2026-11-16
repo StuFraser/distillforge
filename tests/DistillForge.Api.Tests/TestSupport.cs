@@ -19,27 +19,46 @@ public sealed class TestDb : IDisposable
 {
     private readonly SqliteConnection _connection = new("DataSource=:memory:;Foreign Keys=True");
 
+    /// <summary>Two signed-in users. Contexts and seed helpers default to <see cref="UserA"/>; use <see cref="UserB"/> to check isolation.</summary>
+    public static readonly Guid UserA = Guid.Parse("aaaaaaaa-0000-0000-0000-00000000000a");
+    public static readonly Guid UserB = Guid.Parse("bbbbbbbb-0000-0000-0000-00000000000b");
+
     public TestDb()
     {
         _connection.Open();
         using var db = NewContext();
         db.Database.EnsureCreated();
+        var now = DateTimeOffset.UtcNow;
+        db.AppUsers.AddRange(
+            new AppUser { Id = UserA, TenantId = "t", ObjectId = "a", CreatedAt = now, LastSeenAt = now },
+            new AppUser { Id = UserB, TenantId = "t", ObjectId = "b", CreatedAt = now, LastSeenAt = now });
+        db.SaveChanges();
     }
 
-    /// <summary>A fresh context on the shared connection, like a new request would get (so nothing is served from the change tracker).</summary>
-    public DistillForgeDbContext NewContext() =>
-        new(new DbContextOptionsBuilder<DistillForgeDbContext>().UseSqlite(_connection).Options);
+    /// <summary>
+    /// A fresh context on the shared connection, like a new request would get (so nothing is served from the change tracker),
+    /// acting as <paramref name="userId"/> (default <see cref="UserA"/>; pass <see cref="NoUser"/> for a context with nobody signed in).
+    /// </summary>
+    public DistillForgeDbContext NewContext(Guid? userId = null) =>
+        new(new DbContextOptionsBuilder<DistillForgeDbContext>().UseSqlite(_connection).Options)
+        {
+            CurrentUserId = userId == NoUser ? null : userId ?? UserA,
+        };
+
+    /// <summary>Marker for <see cref="NewContext"/>: no signed-in user.</summary>
+    public static readonly Guid NoUser = Guid.Empty;
 
     /// <summary>
     /// A workspace whose source is "AAAAAAAAAA\n\nBBBBBBBBBB\n\nCCCCCCCCCC" split into three 10-character segments
     /// (S1 0-10, S2 12-22, S3 24-34), so selections across segment boundaries are easy to reason about.
     /// </summary>
-    public Workspace SeedWorkspace(bool archived = false)
+    public Workspace SeedWorkspace(bool archived = false, Guid? owner = null)
     {
-        using var db = NewContext();
+        using var db = NewContext(owner);
         var w = new Workspace
         {
             Id = Guid.NewGuid(),
+            OwnerId = owner ?? UserA,
             Title = "Test",
             SourceText = "AAAAAAAAAA\n\nBBBBBBBBBB\n\nCCCCCCCCCC",
             Strategy = SegmentationStrategyKind.Prose,

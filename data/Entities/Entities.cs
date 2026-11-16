@@ -11,6 +11,8 @@ namespace DistillForge.Data.Entities;
 public class Workspace
 {
     public Guid Id { get; set; }
+    /// <summary>The signed-in user who owns this workspace. Stamped on save; null only on rows that pre-date auth (invisible to everyone until claimed).</summary>
+    public Guid? OwnerId { get; set; }
     public required string Title { get; set; }
     public required string SourceText { get; set; }
     public SegmentationStrategyKind Strategy { get; set; }
@@ -121,10 +123,11 @@ public class ExtractionRun
     public Workspace? Workspace { get; set; }
 }
 
-/// <summary>An OpenAI-compatible endpoint (Ollama, LM Studio, OpenAI, OpenRouter...). Owner column arrives with auth.</summary>
+/// <summary>An OpenAI-compatible endpoint (Ollama, LM Studio, OpenAI, OpenRouter...). Per user: each user brings their own.</summary>
 public class AiProvider
 {
     public Guid Id { get; set; }
+    public Guid? OwnerId { get; set; }
     public required string Name { get; set; }
     /// <summary>Includes the version path, e.g. http://host:11434/v1. Stored without a trailing slash.</summary>
     public required string BaseUrl { get; set; }
@@ -140,6 +143,8 @@ public class AiProvider
 public class AiModel
 {
     public Guid Id { get; set; }
+    /// <summary>Same as the provider's owner, denormalised so "one default model per user" can be a unique index.</summary>
+    public Guid? OwnerId { get; set; }
     public Guid AiProviderId { get; set; }
     public required string ModelId { get; set; }
     public string? DisplayName { get; set; }
@@ -152,6 +157,22 @@ public class AiModel
     public AiProvider? Provider { get; set; }
 }
 
+/// <summary>
+/// A signed-in person, identified by the Entra ID tenant + object id from their token (never by email, which can change).
+/// Rows are created on first sign-in. <see cref="Id"/> is what owner columns point at.
+/// </summary>
+public class AppUser
+{
+    public Guid Id { get; set; }
+    /// <summary>The token's <c>tid</c> claim.</summary>
+    public required string TenantId { get; set; }
+    /// <summary>The token's <c>oid</c> claim: stable per user per tenant.</summary>
+    public required string ObjectId { get; set; }
+    public string? DisplayName { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset LastSeenAt { get; set; }
+}
+
 public enum DuplicateSource { Ai, Similarity }
 
 /// <summary>A "these two notes may be the same task" flag. Pairs are stored once, with A &lt; B.</summary>
@@ -159,6 +180,7 @@ public class ActionItemLink
 {
     public Guid Id { get; set; }
     public Guid WorkspaceId { get; set; }
+    public Workspace? Workspace { get; set; }
     public Guid ActionItemAId { get; set; }
     public Guid ActionItemBId { get; set; }
     public DuplicateSource Source { get; set; }

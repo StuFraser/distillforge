@@ -142,6 +142,9 @@ namespace DistillForge.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("ReserveOutput")
                         .HasColumnType("integer");
 
@@ -152,7 +155,7 @@ namespace DistillForge.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsDefault")
+                    b.HasIndex("OwnerId")
                         .IsUnique()
                         .HasFilter("\"IsDefault\" = true");
 
@@ -185,12 +188,51 @@ namespace DistillForge.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("TimeoutSeconds")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OwnerId");
+
                     b.ToTable("AiProviders");
+                });
+
+            modelBuilder.Entity("DistillForge.Data.Entities.AppUser", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ObjectId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ObjectId")
+                        .IsUnique();
+
+                    b.ToTable("AppUsers");
                 });
 
             modelBuilder.Entity("DistillForge.Data.Entities.Category", b =>
@@ -384,6 +426,9 @@ namespace DistillForge.Data.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("SourceText")
                         .IsRequired()
                         .HasColumnType("text");
@@ -404,6 +449,8 @@ namespace DistillForge.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("IsArchived");
+
+                    b.HasIndex("OwnerId");
 
                     b.ToTable("Workspaces");
                 });
@@ -445,11 +492,13 @@ namespace DistillForge.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("DistillForge.Data.Entities.Workspace", null)
+                    b.HasOne("DistillForge.Data.Entities.Workspace", "Workspace")
                         .WithMany()
                         .HasForeignKey("WorkspaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Workspace");
                 });
 
             modelBuilder.Entity("DistillForge.Data.Entities.AiModel", b =>
@@ -460,7 +509,20 @@ namespace DistillForge.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("DistillForge.Data.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Provider");
+                });
+
+            modelBuilder.Entity("DistillForge.Data.Entities.AiProvider", b =>
+                {
+                    b.HasOne("DistillForge.Data.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DistillForge.Data.Entities.Category", b =>
@@ -518,6 +580,14 @@ namespace DistillForge.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Workspace");
+                });
+
+            modelBuilder.Entity("DistillForge.Data.Entities.Workspace", b =>
+                {
+                    b.HasOne("DistillForge.Data.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DistillForge.Data.Entities.ActionItem", b =>

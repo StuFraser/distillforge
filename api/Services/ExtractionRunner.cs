@@ -18,7 +18,9 @@ public sealed class ExtractionRunner(
 {
     public async Task RunAsync(Guid runId, CancellationToken hostCt)
     {
-        var run = await db.ExtractionRuns.FirstOrDefaultAsync(r => r.Id == runId, hostCt);
+        // Queue work has no caller, so there is no signed-in user: look the run up unfiltered, then act as the workspace's owner
+        // from here on, which puts the same ownership filters on everything the run reads and writes.
+        var run = await db.ExtractionRuns.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.Id == runId, hostCt);
         if (run is null)
         {
             logger.LogWarning("Extraction run {RunId} not found (workspace replaced?); skipping.", runId);
@@ -29,6 +31,18 @@ public sealed class ExtractionRunner(
             logger.LogWarning("Extraction run {RunId} is {Status}, not Queued; skipping redelivery.", runId, run.Status);
             return;
         }
+        var ownerId = await db.Workspaces.IgnoreQueryFilters().Where(w => w.Id == run.WorkspaceId).Select(w => w.OwnerId).FirstOrDefaultAsync(hostCt);
+        if (ownerId is null)
+        {
+            logger.LogError("Extraction run {RunId}: its workspace has no owner; refusing to run it.", runId);
+            await db.ExtractionRuns.IgnoreQueryFilters().Where(r => r.Id == runId && r.Status == ExtractionRunStatus.Queued)
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(r => r.Status, ExtractionRunStatus.Failed)
+                    .SetProperty(r => r.Error, "The workspace has no owner.")
+                    .SetProperty(r => r.CompletedAt, DateTimeOffset.UtcNow), hostCt);
+            return;
+        }
+        db.CurrentUserId = ownerId;
 
         // Claim the run atomically: a user cancel that lands between the check above and here must win.
         var started = DateTimeOffset.UtcNow;
@@ -50,7 +64,7 @@ public sealed class ExtractionRunner(
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(hostCt, userCancel.Token);
         var ct = linked.Token;
         using var watcherStop = CancellationTokenSource.CreateLinkedTokenSource(hostCt);
-        var watcher = WatchRunAsync(runId, userCancel, watcherStop.Token);
+        var watcher = WatchRunAsync(runId, ownerId.Value, userCancel, watcherStop.Token);
         var cancelledByUser = false;
 
         try
@@ -187,7 +201,7 @@ public sealed class ExtractionRunner(
     /// hard-killed host can be detected (see <see cref="ExtractionRunReaper"/>). A transient error must not end the loop, or the
     /// heartbeat would stop and a healthy run would be reaped.
     /// </summary>
-    private async Task WatchRunAsync(Guid runId, CancellationTokenSource userCancel, CancellationToken stop)
+    private async Task WatchRunAsync(Guid runId, Guid ownerId, CancellationTokenSource userCancel, CancellationToken stop)
     {
         var lastBeat = DateTimeOffset.UtcNow;
         int consecutiveErrors = 0;
@@ -198,6 +212,7 @@ public sealed class ExtractionRunner(
                 await Task.Delay(TimeSpan.FromSeconds(2), stop);
                 await using var scope = scopes.CreateAsyncScope();
                 var scoped = scope.ServiceProvider.GetRequiredService<DistillForgeDbContext>();
+                scoped.CurrentUserId = ownerId;
                 var status = await scoped.ExtractionRuns.AsNoTracking()
                     .Where(r => r.Id == runId).Select(r => r.Status).FirstOrDefaultAsync(stop);
                 if (status == ExtractionRunStatus.Cancelled) { userCancel.Cancel(); return; }
