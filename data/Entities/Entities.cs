@@ -171,7 +171,11 @@ public class AppUser
     public string? DisplayName { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset LastSeenAt { get; set; }
+    /// <summary>Usage level. Held here, not in the identity provider, so the provider stays swappable. New users start as <see cref="UserTier.Lite"/>.</summary>
+    public UserTier Tier { get; set; } = UserTier.Lite;
 }
+
+public enum UserTier { Lite = 0, Full = 1 }
 
 public enum DuplicateSource { Ai, Similarity }
 

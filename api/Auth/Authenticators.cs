@@ -35,7 +35,7 @@ public sealed class DevAuthenticator : IRequestAuthenticator
 }
 
 /// <summary>
-/// Validates an Entra ID v2.0 access token for the single configured tenant: signature (keys from the tenant's published
+/// Validates an Entra ID (workforce or External ID) v2.0 access token for the single configured tenant: signature (keys from the tenant's published
 /// metadata), issuer, audience, lifetime, the tenant claim and the required delegated scope. Anything else is rejected.
 /// </summary>
 public sealed class JwtAuthenticator : IRequestAuthenticator
@@ -71,13 +71,21 @@ public sealed class JwtAuthenticator : IRequestAuthenticator
             return AuthResult.Fail("Token validation is temporarily unavailable.");
         }
 
+        // The issuer comes from the configured tenant's own metadata (workforce tenants use login.microsoftonline.com,
+        // External ID tenants use <tenant>.ciamlogin.com), so it is never taken from the token being checked.
+        if (string.IsNullOrWhiteSpace(config.Issuer))
+        {
+            _logger.LogError("The tenant metadata did not include an issuer.");
+            return AuthResult.Fail("Token validation is temporarily unavailable.");
+        }
+
         var audiences = new List<string> { _options.ClientId! };
         if (!string.IsNullOrWhiteSpace(_options.Audience)) audiences.Add(_options.Audience);
         audiences.Add($"api://{_options.ClientId}");
 
         var parameters = new TokenValidationParameters
         {
-            ValidIssuer = Authority(_options.TenantId!),
+            ValidIssuer = config.Issuer,
             ValidAudiences = audiences,
             IssuerSigningKeys = config.SigningKeys,
             ValidateIssuer = true,
@@ -98,6 +106,7 @@ public sealed class JwtAuthenticator : IRequestAuthenticator
                 _metadata.RequestRefresh();
                 config = await _metadata.GetConfigurationAsync(ct);
                 parameters.IssuerSigningKeys = config.SigningKeys;
+                parameters.ValidIssuer = config.Issuer;
                 result = await _handler.ValidateTokenAsync(token, parameters);
             }
             if (!result.IsValid)
@@ -115,7 +124,9 @@ public sealed class JwtAuthenticator : IRequestAuthenticator
         var scopes = (claims.FindFirst("scp")?.Value ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (!scopes.Contains(_options.RequiredScope, StringComparer.Ordinal)) return AuthResult.Fail($"Token is missing the {_options.RequiredScope} scope.");
 
-        var name = claims.FindFirst("name")?.Value ?? claims.FindFirst("preferred_username")?.Value;
+        // External ID reports "unknown" when no display name was collected; treat that as no name.
+        var name = new[] { claims.FindFirst("name")?.Value, claims.FindFirst("preferred_username")?.Value, claims.FindFirst("email")?.Value }
+            .FirstOrDefault(s => !string.IsNullOrWhiteSpace(s) && !s.Equals("unknown", StringComparison.OrdinalIgnoreCase));
         return AuthResult.Ok(new AuthenticatedUser(tid!.ToLowerInvariant(), oid.ToLowerInvariant(), name));
     }
 }

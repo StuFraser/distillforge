@@ -12,13 +12,13 @@ else
     <AuthorizeView>
         <Authorized>
             <div class="account">
-                <button type="button" class="avatar" title="@context.User.Identity?.Name" aria-label="Account menu" aria-haspopup="true" aria-expanded="@_open.ToString().ToLowerInvariant()"
-                        @onclick="() => _open = !_open">@Initials(context.User.Identity?.Name)</button>
+                <button type="button" class="avatar" title="@DisplayName(context.User)" aria-label="Account menu" aria-haspopup="true" aria-expanded="@_open.ToString().ToLowerInvariant()"
+                        @onclick="() => _open = !_open">@Initials(DisplayName(context.User))</button>
                 @if (_open)
                 {
                     <div class="account-backdrop" @onclick="() => _open = false"></div>
                     <div class="account-menu" role="menu">
-                        <div class="account-name">@(context.User.Identity?.Name ?? "Signed in")</div>
+                        <div class="account-name">@(DisplayName(context.User) ?? "Signed in")</div>
                         <button type="button" role="menuitem" @onclick="SignOut">Sign out</button>
                     </div>
                 }
@@ -36,6 +36,17 @@ else
     private void SignIn() => Navigation.NavigateToLogin("authentication/login");
 
     private void SignOut() => Navigation.NavigateToLogout("authentication/logout", "/");
+
+    /// <summary>External ID reports the name claim as "unknown" when no display name was collected at sign-up; fall back to the email.</summary>
+    private static string? DisplayName(System.Security.Claims.ClaimsPrincipal user)
+    {
+        static bool Usable(string? s) => !string.IsNullOrWhiteSpace(s) && !s.Equals("unknown", StringComparison.OrdinalIgnoreCase);
+        var name = user.Identity?.Name;
+        if (Usable(name)) return name;
+        foreach (var type in new[] { "email", "emails", "preferred_username", "upn" })
+            if (user.FindFirst(type)?.Value is { } v && Usable(v)) return v;
+        return null;
+    }
 
     private static string Initials(string? name)
     {

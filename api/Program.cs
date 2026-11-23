@@ -28,7 +28,7 @@ else
 {
     builder.Services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(_ =>
         new ConfigurationManager<OpenIdConnectConfiguration>(
-            JwtAuthenticator.Authority(auth.TenantId!) + "/.well-known/openid-configuration",
+            auth.ResolvedAuthority + "/.well-known/openid-configuration",
             new OpenIdConnectConfigurationRetriever(), new HttpDocumentRetriever()));
     builder.Services.AddSingleton<IRequestAuthenticator, JwtAuthenticator>();
 }

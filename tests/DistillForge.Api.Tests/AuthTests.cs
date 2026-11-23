@@ -53,7 +53,7 @@ public class JwtAuthenticatorTests
     {
         public Task<OpenIdConnectConfiguration> GetConfigurationAsync(CancellationToken cancel)
         {
-            var c = new OpenIdConnectConfiguration();
+            var c = new OpenIdConnectConfiguration { Issuer = Issuer };
             foreach (var k in keys) c.SigningKeys.Add(k);
             return Task.FromResult(c);
         }

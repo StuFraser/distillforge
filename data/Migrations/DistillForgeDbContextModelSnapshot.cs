@@ -227,6 +227,13 @@ namespace DistillForge.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("Tier")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Lite");
+
                     b.HasKey("Id");
 
                     b.HasIndex("TenantId", "ObjectId")

@@ -6,6 +6,7 @@
     "ConnectionStrings__Postgres": "Host=<postgres-host>;Port=5432;Database=distillforge;Username=<user>;Password=<password>",
     "Auth__Mode": "Dev",
     "Auth__TenantId": "<directory (tenant) id; only used when Auth__Mode is not Dev>",
+    "Auth__Authority": "<optional; Entra External ID: https://<name>.ciamlogin.com/<tenant-id>/v2.0. Leave empty for a workforce tenant>",
     "Auth__ClientId": "<application (client) id of the DistillForge API app registration>",
     "Auth__Audience": "",
     "Auth__ClaimOrphanedData": "false",

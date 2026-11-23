@@ -55,6 +55,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             e.Property(x => x.TenantId).HasMaxLength(64);
             e.Property(x => x.ObjectId).HasMaxLength(64);
             e.Property(x => x.DisplayName).HasMaxLength(200);
+            e.Property(x => x.Tier).HasConversion<string>().HasMaxLength(16).HasDefaultValue(UserTier.Lite);
             e.HasIndex(x => new { x.TenantId, x.ObjectId }).IsUnique();
         });
 

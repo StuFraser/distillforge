@@ -15,6 +15,17 @@ public sealed class AuthOptions
 
     public AuthMode Mode { get; set; } = AuthMode.Entra;
 
+    /// <summary>
+    /// Optional v2.0 authority whose published metadata supplies the signing keys and the expected issuer, e.g.
+    /// <c>https://&lt;name&gt;.ciamlogin.com/&lt;tenant-id&gt;/v2.0</c> for an Entra External ID tenant.
+    /// Defaults to <c>https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0</c>.
+    /// </summary>
+    public string? Authority { get; set; }
+
+    /// <summary>The authority to load metadata from: <see cref="Authority"/> or the workforce default for <see cref="TenantId"/>.</summary>
+    public string ResolvedAuthority =>
+        !string.IsNullOrWhiteSpace(Authority) ? Authority.Trim().TrimEnd('/') : JwtAuthenticator.Authority(TenantId!);
+
     /// <summary>Directory (tenant) id of the single tenant whose users may sign in.</summary>
     public string? TenantId { get; set; }
 
