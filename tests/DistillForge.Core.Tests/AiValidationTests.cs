@@ -34,6 +34,8 @@ public class AiValidationTests
         Assert.Null(AiValidation.ValidateModel(new("llama3.1:8b", null, 8192, 2048, ResponseFormatMode.JsonSchema, false)));
         Assert.NotNull(AiValidation.ValidateModel(new("", null, 8192, 2048, ResponseFormatMode.JsonSchema, false)));
         Assert.NotNull(AiValidation.ValidateModel(new("m", null, 100, 50, ResponseFormatMode.JsonSchema, false)));
+        Assert.NotNull(AiValidation.ValidateModel(new("m", null, 8192, 2048, ResponseFormatMode.JsonSchema, false, (ThinkingMode)99)));
+        Assert.Null(AiValidation.ValidateModel(new("m", null, 8192, 2048, ResponseFormatMode.JsonSchema, false, ThinkingMode.Off)));
         Assert.NotNull(AiValidation.ValidateModel(new("m", null, 8192, 8192, ResponseFormatMode.JsonSchema, false)));
         Assert.NotNull(AiValidation.ValidateModel(new("m", null, 8192, 2048, (ResponseFormatMode)99, false)));
     }
@@ -44,4 +46,15 @@ public class AiValidationTests
         Assert.Equal("Llama · Home", AiValidation.ModelLabel("Home", "llama3.1:8b", "Llama"));
         Assert.Equal("llama3.1:8b · Home", AiValidation.ModelLabel("Home", "llama3.1:8b", null));
     }
+}
+
+public class ThinkingModeTests
+{
+    [Theory]
+    [InlineData(ThinkingMode.Default, null)]
+    [InlineData(ThinkingMode.Off, "none")]
+    [InlineData(ThinkingMode.Low, "low")]
+    [InlineData(ThinkingMode.Medium, "medium")]
+    [InlineData(ThinkingMode.High, "high")]
+    public void Maps_to_the_reasoning_effort_value(ThinkingMode mode, string? expected) => Assert.Equal(expected, mode.ToEffort());
 }

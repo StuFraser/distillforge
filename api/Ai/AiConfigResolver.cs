@@ -31,6 +31,7 @@ public sealed class AiConfigResolver(DistillForgeDbContext db, SecretProtector s
                 ContextTokens = model.ContextTokens,
                 ReserveOutput = model.ReserveOutput,
                 ResponseFormat = model.ResponseFormat,
+                Thinking = model.Thinking,
                 TimeoutSeconds = p.TimeoutSeconds,
                 SafetyMargin = fallback.Value.SafetyMargin,
             };

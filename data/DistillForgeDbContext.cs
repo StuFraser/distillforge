@@ -152,6 +152,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             e.Property(x => x.ModelId).HasMaxLength(200);
             e.Property(x => x.DisplayName).HasMaxLength(100);
             e.Property(x => x.ResponseFormat).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.Thinking).HasConversion<string>().HasMaxLength(16).HasDefaultValue(DistillForge.Core.Contracts.ThinkingMode.Default);
             e.HasOne(x => x.Provider).WithMany(p => p.Models).HasForeignKey(x => x.AiProviderId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.AiProviderId, x.ModelId }).IsUnique();
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);

@@ -40,6 +40,7 @@ public sealed class ModelEntry
     public string? ApiKey { get; set; }
     public string? ApiKeyEnv { get; set; }
     public ResponseFormatMode ResponseFormat { get; set; } = ResponseFormatMode.JsonSchema;
+    public ThinkingMode Thinking { get; set; } = ThinkingMode.Default;
     public int TimeoutSeconds { get; set; } = 300;
 
     public string? ResolveKey() =>

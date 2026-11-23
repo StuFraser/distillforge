@@ -75,6 +75,7 @@ try
             ContextTokens = profile.ContextTokens,
             ReserveOutput = profile.ReserveOutput,
             ResponseFormat = model.ResponseFormat,
+            Thinking = model.Thinking,
             TimeoutSeconds = model.TimeoutSeconds,
         };
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(model.TimeoutSeconds) };

@@ -21,7 +21,7 @@ public static class Mapping
         a.Colour, a.MergedIntoId, possibleDuplicates ?? []);
 
     public static AiModelDto ToDto(this AiModel m) => new(
-        m.Id, m.AiProviderId, m.ModelId, m.DisplayName, m.ContextTokens, m.ReserveOutput, m.ResponseFormat, m.IsDefault);
+        m.Id, m.AiProviderId, m.ModelId, m.DisplayName, m.ContextTokens, m.ReserveOutput, m.ResponseFormat, m.IsDefault, m.Thinking);
 
     public static AiProviderDto ToDto(this AiProvider p) => new(
         p.Id, p.Name, p.BaseUrl, !string.IsNullOrEmpty(p.ApiKeyEncrypted), p.TimeoutSeconds,

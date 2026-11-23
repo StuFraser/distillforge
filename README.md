@@ -52,7 +52,12 @@ no code specific to any one backend.
 
 Providers and models are managed in the app (the ⚙ in the top bar): a provider is an
 endpoint plus optional API key, and each of its models has its own context window,
-reserved output size and structured-output mode. API keys are encrypted at rest and are
+reserved output size, structured-output mode and a **Thinking** level. Thinking
+(Model default, Off, Low, Medium, High) is sent as the OpenAI-style `reasoning_effort`
+parameter, only when set. Reasoning models such as Qwen 3.5 or Gemma 4 spend output tokens
+on hidden reasoning and can hit `finish_reason=length` at a small reserved output, so set
+them to Off. Leave it on Model default for non-reasoning models (e.g. Llama 3.1) and for services
+that reject the parameter; DeepSeek-R1 ignores it. API keys are encrypted at rest and are
 never sent back to the browser. The model for each extraction is picked from a dropdown.
 
 The `AiProvider__*` settings in `api/local.settings.json` are only a **fallback**, used
@@ -170,8 +175,9 @@ configure providers in the app instead (⚙ in the top bar).
 |---------|---------|-------|
 | `ConnectionStrings__Postgres` | `Host=db;Database=distillforge;Username=…;Password=…` | |
 | `AzureWebJobsStorage` | `UseDevelopmentStorage=true` | Azurite |
-| `Auth__Mode` | `Dev` | `Dev` = fake user, no sign-in (Development only). Leave unset (Entra) once the app registrations exist; see `design-notes/entraId_provisioning.md` |
-| `Auth__TenantId`, `Auth__ClientId` | *(GUIDs)* | Entra mode only: your tenant and the API app registration. `Auth__Audience` is an optional extra accepted audience |
+| `Auth__Mode` | `Dev` | `Dev` = fake user, no sign-in (Development only). Leave unset (Entra) once the app registrations exist; see [Sign-in](#4-sign-in-microsoft-entra-external-id) |
+| `Auth__TenantId`, `Auth__ClientId` | *(GUIDs)* | Entra mode only: your tenant and the **API** app registration. `Auth__Audience` is an optional extra accepted audience |
+| `Auth__Authority` | `https://<name>.ciamlogin.com/<tenant-id>/v2.0` | Entra External ID only. Where the API loads signing keys and the expected issuer from. Leave empty for a workforce tenant |
 | `Auth__ClaimOrphanedData` | `true` / `false` | One-off: the first *new* user to sign in takes over rows created before auth existed (otherwise they are invisible to everyone). Turn on for that first sign-in, then off |
 | `Encryption__Key` | *(32 random bytes, base64)* | `openssl rand -base64 32`. Needed to store API keys; back it up, as losing it makes stored keys unreadable |
 | `AiProvider__BaseUrl` | `http://mini.lan:11434/v1` | **Fallback only**, used when no model is configured in the app. Include the `/v1` |
@@ -194,7 +200,55 @@ dotnet ef database update --project data/DistillForge.Data.csproj --startup-proj
 `dotnet ef` reads the connection string from `api/local.settings.json`. A
 `ConnectionStrings__Postgres` environment variable, if set, takes precedence (useful in CI).
 
-### 4. Run
+### 4. Sign-in (Microsoft Entra External ID)
+
+Sign-in uses **Microsoft Entra External ID**, Microsoft's service for public sign-up (email one-time
+code, and social providers if you add them). It is free for the first 50,000 monthly active users;
+check current pricing. Skip this section for local work and use dev mode (see [API](#api)).
+
+The tenant and app IDs are not secrets: `blazor/wwwroot/appsettings.json` is downloaded by every
+visitor, and there is no client secret anywhere. Security rests on the API validating every token.
+
+One-off setup in the [Entra admin center](https://entra.microsoft.com):
+
+1. **External tenant.** Entra ID → Overview → Manage tenants → Create → **External**. This needs an
+   Azure subscription *in the directory you create it from* (otherwise the dropdown is empty). Choose
+   the data location carefully: it cannot be changed. Then switch into the new tenant.
+2. **API registration** (`DistillForge API`): single tenant. Under *Expose an API*, accept the default
+   Application ID URI (`api://<client-id>`) and add a scope `access_as_user` (admins and users).
+3. **Web registration** (`DistillForge Web`): add a **Single-page application** redirect URI for each
+   front-end origin (e.g. `http://localhost:5189/authentication/login-callback`, and your deployed URL).
+   Under *API permissions* add `access_as_user` from the API and **grant admin consent**.
+4. **User flow.** External Identities → User flows → New: *Email one-time passcode* (or with password),
+   collecting **Display Name**, returned in the token (otherwise the name claim is `unknown`). Add the
+   web app to the flow's *Applications*, or sign-up is not offered.
+
+Then configure both sides:
+
+| Where | Setting | Value |
+|-------|---------|-------|
+| `api/local.settings.json` | `Auth__Mode` | leave unset or `Entra` |
+| | `Auth__TenantId` | the external tenant's id |
+| | `Auth__Authority` | `https://<name>.ciamlogin.com/<tenant-id>/v2.0` |
+| | `Auth__ClientId` | the **API** registration's client id |
+| `blazor/wwwroot/appsettings.json` | `Auth:TenantId` | the external tenant's id |
+| | `Auth:Authority` | `https://<name>.ciamlogin.com/<tenant-id>` |
+| | `Auth:ClientId` | the **Web** registration's client id |
+| | `Auth:ApiScope` | `api://<api-client-id>/access_as_user` |
+
+Notes:
+
+- **Issuer:** the API reads the expected issuer and signing keys from the tenant's published metadata.
+  External ID uses `<tenant-id>.ciamlogin.com`, a workforce tenant `login.microsoftonline.com`.
+  A workforce tenant also works: leave `Auth__Authority` empty and omit `Auth:Authority`.
+  Workforce accounts must sign in with their tenant UPN (`you@<name>.onmicrosoft.com`); a personal
+  Microsoft account is rejected unless invited as a guest.
+- **Tiers:** each user has a `Tier` (`Lite` by default, or `Full`) in the `AppUsers` table, deliberately
+  kept out of the identity provider so it stays swappable. Promote someone with
+  `UPDATE "AppUsers" SET "Tier" = 'Full' WHERE "DisplayName" = '…';`. Per-tier limits are not enforced yet.
+- **Sign-up is open:** anyone who finds the site can create an account, so per-user caps matter.
+
+### 5. Run
 
 ```bash
 npx azurite                    # if not using docker compose
@@ -206,10 +260,10 @@ The front end finds the API through `blazor/wwwroot/appsettings.json` (`ApiBaseU
 
 ## API
 
-Every endpoint requires sign-in: a valid Entra ID access token for your single tenant (scope `access_as_user`), otherwise 401.
+Every endpoint requires sign-in: a valid access token from the configured Entra tenant (scope `access_as_user`), otherwise 401.
 All data (workspaces, notes, AI providers) belongs to the signed-in user; other users' data returns 404. For local work without
-Entra, set `Auth__Mode=Dev` (a fixed fake user, no tokens; the API refuses to start with it outside Development).
-The Blazor sign-in is not wired up yet, so until then run the API in Dev mode. Everything is under `/api`.
+sign-in, set `Auth__Mode=Dev` (a fixed fake user, no tokens; the API refuses to start with it outside Development) and leave the
+`Auth` section of `blazor/wwwroot/appsettings.json` empty. Everything is under `/api`.
 
 | Area | Routes |
 |------|--------|
@@ -257,8 +311,9 @@ when tuning prompts and checking how faithfully quotes are copied.
    **deleting notes** ✅
 4. ✅ **File upload:** txt, md, PDF (text only, no OCR), docx. Tables and multi-column PDFs
    are not yet checked closely
-5. Entra ID sign-in (API security), per-user data and AI provider settings: 🚧 API side done
-   (token validation, per-user data, dev user); Blazor sign-in, SSRF guard and per-user limits still to do
+5. Sign-in (Entra External ID, open sign-up), per-user data and AI provider settings: 🚧 sign-in,
+   token validation, per-user data and the Lite/Full `Tier` column are done; SSRF guard and the
+   per-tier usage limits still to do
 6. Export per category: ✅ **email** (preview, then open in your mail program or copy; no credentials).
    Next: GitHub Issues, then DevOps, Jira and others, behind one shared interface. These need saved
    credentials, so they follow Entra ID

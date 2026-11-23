@@ -151,6 +151,8 @@ public class AiModel
     public int ContextTokens { get; set; } = 8192;
     public int ReserveOutput { get; set; } = 2048;
     public ResponseFormatMode ResponseFormat { get; set; } = ResponseFormatMode.JsonSchema;
+    /// <summary>Default sends no reasoning_effort; Off/Low/Medium/High send it (reasoning models such as Qwen3 or Gemma 4).</summary>
+    public ThinkingMode Thinking { get; set; } = ThinkingMode.Default;
     /// <summary>At most one model is the default (enforced by a partial unique index).</summary>
     public bool IsDefault { get; set; }
 

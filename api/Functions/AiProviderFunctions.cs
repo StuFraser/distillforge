@@ -213,6 +213,7 @@ public sealed class AiProviderFunctions(DistillForgeDbContext db, SecretProtecto
         m.ContextTokens = r.ContextTokens;
         m.ReserveOutput = r.ReserveOutput;
         m.ResponseFormat = r.ResponseFormat;
+        m.Thinking = r.Thinking;
     }
 
     /// <summary>Saves, making <paramref name="m"/> the one default when asked. Clears the old default first (unique index).</summary>

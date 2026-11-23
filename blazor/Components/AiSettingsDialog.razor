@@ -49,7 +49,7 @@
                                     @if (m.DisplayName is not null) { <span class="muted small">(@m.ModelId)</span> }
                                     @if (m.IsDefault) { <span class="chip">default</span> }
                                 </span>
-                                <span class="muted small">@m.ContextTokens.ToString("N0") ctx · @m.ResponseFormat</span>
+                                <span class="muted small">@m.ContextTokens.ToString("N0") ctx · @m.ResponseFormat@(m.Thinking != ThinkingMode.Default ? $" · thinking {m.Thinking.ToString().ToLowerInvariant()}" : "")</span>
                                 <span class="provider-actions">
                                     @if (!m.IsDefault)
                                     {
@@ -182,6 +182,20 @@
                 <option value="@ResponseFormatMode.None">None (prompt only, retry on bad JSON)</option>
             </select>
 
+            <label for="m-think">Thinking</label>
+            <select id="m-think" @bind="_mThink" disabled="@_busy">
+                <option value="@ThinkingMode.Default">Model default (send nothing)</option>
+                <option value="@ThinkingMode.Off">Off (fastest; best for Qwen, Gemma and similar reasoning models)</option>
+                <option value="@ThinkingMode.Low">Low</option>
+                <option value="@ThinkingMode.Medium">Medium</option>
+                <option value="@ThinkingMode.High">High</option>
+            </select>
+            <p class="muted small">
+                Reasoning models write hidden scratch-work before answering. It uses time and output tokens (it can use up the
+                reserved output and cut the answer off) and rarely matters for extraction. Models that don't reason, and
+                providers that don't support it, may reject this setting; leave it on the default for them.
+            </p>
+
             <label class="check"><input type="checkbox" @bind="_mDefault" disabled="@(_busy || _editingModel?.IsDefault == true)" /> Use as the default model</label>
 
             <div class="dialog-actions">
@@ -226,6 +240,7 @@
     private string _mId = "", _mName = "";
     private int _mCtx = 8192, _mRes = 2048;
     private ResponseFormatMode _mFmt = ResponseFormatMode.JsonSchema;
+    private ThinkingMode _mThink = ThinkingMode.Default;
     private bool _mDefault;
     private List<string> _discovered = [];
     private string? _discoverNote;
@@ -330,6 +345,7 @@
         _mCtx = m?.ContextTokens ?? 8192;
         _mRes = m?.ReserveOutput ?? 2048;
         _mFmt = m?.ResponseFormat ?? ResponseFormatMode.JsonSchema;
+        _mThink = m?.Thinking ?? ThinkingMode.Default;
         _mDefault = m?.IsDefault ?? false;
         _discovered = [];
         _discoverNote = "Looking up the provider's models…";
@@ -347,7 +363,7 @@
         catch (ApiException) { _discoverNote = null; }
     }
 
-    private AiModelRequest BuildModel() => new(_mId.Trim(), string.IsNullOrWhiteSpace(_mName) ? null : _mName.Trim(), _mCtx, _mRes, _mFmt, _mDefault);
+    private AiModelRequest BuildModel() => new(_mId.Trim(), string.IsNullOrWhiteSpace(_mName) ? null : _mName.Trim(), _mCtx, _mRes, _mFmt, _mDefault, _mThink);
 
     private async Task SaveModel()
     {
@@ -366,7 +382,7 @@
 
     private Task MakeDefault(AiModelDto m) => Run(async () =>
     {
-        await Api.UpdateAiModelAsync(m.Id, new AiModelRequest(m.ModelId, m.DisplayName, m.ContextTokens, m.ReserveOutput, m.ResponseFormat, true), _cts.Token);
+        await Api.UpdateAiModelAsync(m.Id, new AiModelRequest(m.ModelId, m.DisplayName, m.ContextTokens, m.ReserveOutput, m.ResponseFormat, true, m.Thinking), _cts.Token);
         await Reload();
     });
 

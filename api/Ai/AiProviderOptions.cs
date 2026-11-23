@@ -22,6 +22,8 @@ public sealed class AiProviderOptions
     public double SafetyMargin { get; set; } = 0.1;
 
     public ResponseFormatMode ResponseFormat { get; set; } = ResponseFormatMode.JsonSchema;
+    /// <summary>Default sends nothing; otherwise sent as <c>reasoning_effort</c>.</summary>
+    public ThinkingMode Thinking { get; set; } = ThinkingMode.Default;
     public int TimeoutSeconds { get; set; } = 300;
 
     /// <summary>Tokens available for the prompt in a single window.</summary>

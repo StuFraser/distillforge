@@ -153,6 +153,13 @@ namespace DistillForge.Data.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
+                    b.Property<string>("Thinking")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Default");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerId")

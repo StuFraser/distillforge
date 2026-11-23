@@ -14,6 +14,33 @@ public enum ResponseFormatMode
     None,
 }
 
+/// <summary>
+/// How much hidden "thinking" a reasoning model does before answering. Uses time and output tokens, and rarely matters for extraction.
+/// <see cref="Default"/> sends nothing (the model's own behaviour); the others send the standard <c>reasoning_effort</c> parameter.
+/// </summary>
+public enum ThinkingMode
+{
+    Default = 0,
+    /// <summary>reasoning_effort: none.</summary>
+    Off,
+    Low,
+    Medium,
+    High,
+}
+
+public static class ThinkingModes
+{
+    /// <summary>The <c>reasoning_effort</c> value to send, or null to send nothing.</summary>
+    public static string? ToEffort(this ThinkingMode m) => m switch
+    {
+        ThinkingMode.Off => "none",
+        ThinkingMode.Low => "low",
+        ThinkingMode.Medium => "medium",
+        ThinkingMode.High => "high",
+        _ => null,
+    };
+}
+
 /// <summary>An OpenAI-compatible endpoint. The API key is write-only: only <see cref="HasApiKey"/> is ever returned.</summary>
 public sealed record AiProviderDto(
     Guid Id,
@@ -31,7 +58,8 @@ public sealed record AiModelDto(
     int ContextTokens,
     int ReserveOutput,
     ResponseFormatMode ResponseFormat,
-    bool IsDefault);
+    bool IsDefault,
+    ThinkingMode Thinking = ThinkingMode.Default);
 
 /// <summary>ApiKey: null keeps the stored key, "" clears it, anything else replaces it.</summary>
 public sealed record AiProviderRequest(string Name, string BaseUrl, string? ApiKey, int TimeoutSeconds = 300);
@@ -42,7 +70,8 @@ public sealed record AiModelRequest(
     int ContextTokens,
     int ReserveOutput,
     ResponseFormatMode ResponseFormat,
-    bool IsDefault);
+    bool IsDefault,
+    ThinkingMode Thinking = ThinkingMode.Default);
 
 /// <summary>Lists models from an endpoint. Set ProviderId to reuse that provider's stored key when ApiKey is null.</summary>
 public sealed record DiscoverModelsRequest(string BaseUrl, string? ApiKey, Guid? ProviderId = null);
@@ -95,6 +124,7 @@ public static class AiValidation
         if (r.ReserveOutput < 256) return "Reserved output must be at least 256 tokens.";
         if (r.ReserveOutput >= r.ContextTokens) return "Reserved output must be smaller than the context window.";
         if (!Enum.IsDefined(r.ResponseFormat)) return "Unknown response format.";
+        if (!Enum.IsDefined(r.Thinking)) return "Unknown thinking setting.";
         return null;
     }
 

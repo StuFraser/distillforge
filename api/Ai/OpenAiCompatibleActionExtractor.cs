@@ -124,6 +124,8 @@ public sealed class OpenAiCompatibleActionExtractor(
             ["max_tokens"] = _opt.ReserveOutput,
             ["stream"] = false,
         };
+        // Only when the user chose a thinking level for this model: real OpenAI rejects it on non-reasoning models.
+        if (_opt.Thinking.ToEffort() is { } effort) body["reasoning_effort"] = effort;
         switch (_opt.ResponseFormat)
         {
             case ResponseFormatMode.JsonSchema:
