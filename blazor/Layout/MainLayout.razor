@@ -6,6 +6,7 @@
         <h1 class="brand">Distill<span>Forge</span></h1>
         <div class="banner-actions">
             <button type="button" class="icon-button" @onclick="() => _aiSettings = true" title="AI providers and models" aria-label="AI settings">⚙</button>
+            <button type="button" class="icon-button" @onclick="() => _integrations = true" title="Integrations (GitHub, Jira, Trello, Azure DevOps…)" aria-label="Integrations">🔌</button>
             <button type="button" class="icon-button" disabled title="Share / publish all categories – coming soon" aria-label="Share">⤴</button>
             <a class="icon-button" href="help" target="_blank" rel="noopener" title="Help (opens in a new tab)" aria-label="Help">?</a>
             <AccountMenu />
@@ -23,8 +24,13 @@
     <AiSettingsDialog OnClose="CloseAiSettings" />
 }
 
+@if (_integrations)
+{
+    <IntegrationsDialog OnClose="() => _integrations = false" />
+}
+
 @code {
-    private bool _aiSettings;
+    private bool _aiSettings, _integrations;
 
     private void CloseAiSettings()
     {

@@ -1,3 +1,4 @@
+using DistillForge.Core.Integrations;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
@@ -93,6 +94,19 @@ public sealed class DistillForgeApi(HttpClient http)
 
     public async Task<DiscoverModelsResponse> DiscoverModelsAsync(DiscoverModelsRequest r, CancellationToken ct = default) =>
         (await Send<DiscoverModelsResponse>(() => http.PostAsJsonAsync("ai/discover", r, ct), ct))!;
+
+    // ---- Integrations ----
+
+    public async Task<List<IntegrationDto>> GetIntegrationsAsync(CancellationToken ct = default) =>
+        await Send<List<IntegrationDto>>(() => http.GetAsync("integrations", ct), ct) ?? [];
+
+    public async Task<IntegrationDto> CreateIntegrationAsync(IntegrationRequest r, CancellationToken ct = default) =>
+        (await Send<IntegrationDto>(() => http.PostAsJsonAsync("integrations", r, ct), ct))!;
+
+    public async Task<IntegrationDto> UpdateIntegrationAsync(Guid id, IntegrationRequest r, CancellationToken ct = default) =>
+        await Send<IntegrationDto>(() => http.PutAsJsonAsync($"integrations/{id}", r, ct), ct) ?? throw new ApiException("That connection no longer exists.");
+
+    public Task DeleteIntegrationAsync(Guid id, CancellationToken ct = default) => Delete($"integrations/{id}", ct);
 
     private async Task Delete(string url, CancellationToken ct)
     {

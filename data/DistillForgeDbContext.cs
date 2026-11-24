@@ -15,6 +15,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
     public DbSet<ExtractionRun> ExtractionRuns => Set<ExtractionRun>();
     public DbSet<AiProvider> AiProviders => Set<AiProvider>();
     public DbSet<AiModel> AiModels => Set<AiModel>();
+    public DbSet<Integration> Integrations => Set<Integration>();
 
     /// <summary>
     /// The signed-in user this context acts for. Set once per request by the auth middleware (or by the queue runner, to the
@@ -35,12 +36,12 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
-    /// <summary>New workspaces, providers and models belong to the current user. Refuses to save them with no user rather than create ownerless rows.</summary>
+    /// <summary>New workspaces, providers, models and integrations belong to the current user. Refuses to save them with no user rather than create ownerless rows.</summary>
     private void StampOwners()
     {
         foreach (var entry in ChangeTracker.Entries().Where(e => e.State == EntityState.Added))
         {
-            if (entry.Entity is not (Workspace or AiProvider or AiModel)) continue;
+            if (entry.Entity is not (Workspace or AiProvider or AiModel or Integration)) continue;
             var owner = entry.Property("OwnerId");
             if (owner.CurrentValue is not null) continue;
             owner.CurrentValue = CurrentUserId
@@ -64,6 +65,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
         b.Entity<Workspace>().HasQueryFilter(w => CurrentUserId != null && w.OwnerId == CurrentUserId);
         b.Entity<AiProvider>().HasQueryFilter(p => CurrentUserId != null && p.OwnerId == CurrentUserId);
         b.Entity<AiModel>().HasQueryFilter(m => CurrentUserId != null && m.OwnerId == CurrentUserId);
+        b.Entity<Integration>().HasQueryFilter(i => CurrentUserId != null && i.OwnerId == CurrentUserId);
         b.Entity<Segment>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
         b.Entity<Category>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
         b.Entity<ActionItem>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
@@ -158,6 +160,15 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
             // One default model per user.
             e.HasIndex(x => x.OwnerId).IsUnique().HasFilter("\"IsDefault\" = true");
+        });
+
+        b.Entity<Integration>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(100);
+            e.Property(x => x.Platform).HasConversion<string>().HasMaxLength(32);
+            e.Property(x => x.SecretsEncrypted).HasMaxLength(8000);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.OwnerId);
         });
     }
 }

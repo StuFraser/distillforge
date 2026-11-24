@@ -1,0 +1,222 @@
+@using DistillForge.Core.Integrations
+@inject DistillForgeApi Api
+@inject DialogService Dialogs
+@implements IDisposable
+
+<div class="dialog-backdrop" @onclick="Close">
+    <div class="dialog ai-dialog" role="dialog" aria-modal="true" aria-labelledby="int-title" @onclick:stopPropagation="true">
+        <h2 id="int-title">Integrations</h2>
+
+        @if (_error is not null)
+        {
+            <p class="warning error" role="alert">@_error</p>
+        }
+
+        @if (_view == View.List)
+        {
+            <p class="muted">
+                Connect the tools you push notes to. Connections are private to your account; tokens are encrypted on the server and never shown again.
+            </p>
+
+            @if (_loading)
+            {
+                <p class="muted">Loading…</p>
+            }
+            else if (_connections.Count == 0)
+            {
+                <p class="empty-hint">No connections yet.</p>
+            }
+
+            @foreach (var c in _connections)
+            {
+                var def = IntegrationCatalog.Get(c.Platform);
+                <div class="provider-card">
+                    <div class="provider-head">
+                        <div>
+                            <strong>@c.Name</strong> <span class="chip">@def.Name</span>
+                            <div class="muted small">@Summary(c, def)</div>
+                        </div>
+                        <div class="provider-actions">
+                            <button type="button" class="secondary" @onclick="() => Edit(c)">Edit</button>
+                            <button type="button" class="secondary" @onclick="() => Remove(c)">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="dialog-actions">
+                <button type="button" class="secondary" @onclick="StartAdd">＋ Add connection</button>
+                <button type="button" class="primary" @onclick="Close">Done</button>
+            </div>
+        }
+        else if (_view == View.Pick)
+        {
+            <h3>Choose a platform</h3>
+            @foreach (var p in IntegrationCatalog.All)
+            {
+                <button type="button" class="provider-card platform-pick" @onclick="() => StartForm(p, null)">
+                    <strong>@p.Name</strong>
+                    <span class="muted small">@p.Description</span>
+                </button>
+            }
+            <div class="dialog-actions">
+                <button type="button" class="secondary" @onclick="BackToList">Cancel</button>
+            </div>
+        }
+        else
+        {
+            <h3>@(_editing is null ? "Add" : "Edit") @_def!.Name <span class="muted small">connection</span></h3>
+            @if (_def.HelpUrl is not null)
+            {
+                <p class="muted small">Need a token? <a href="@_def.HelpUrl" target="_blank" rel="noopener noreferrer">Open @_def.Name's token page</a>.</p>
+            }
+
+            <label for="int-name">Name</label>
+            <input id="int-name" type="text" maxlength="@IntegrationValidation.MaxName" @bind="_name" @bind:event="oninput" disabled="@_busy"
+                   placeholder="@($"e.g. {_def.Name} – my project")" />
+
+            @foreach (var f in _def.Fields)
+            {
+                var id = $"int-f-{f.Key}";
+                <div>
+                    <label for="@id">@f.Label @if (!f.Required) { <span class="muted small">(optional)</span> }</label>
+                    @if (f.IsSecret && HasStoredSecret(f) && !_replace.Contains(f.Key))
+                    {
+                        <div class="dialog-row">
+                            <span class="muted">A value is saved.</span>
+                            <button type="button" class="link" @onclick="() => _replace.Add(f.Key)">Replace</button>
+                            @if (!f.Required) { <button type="button" class="link" @onclick="() => ClearSecret(f)">Remove</button> }
+                        </div>
+                    }
+                    else if (f.Kind == FieldKind.Select)
+                    {
+                        <select id="@id" value="@Value(f)" @onchange="e => SetValue(f, e.Value)" disabled="@_busy">
+                            @foreach (var o in f.Options!) { <option value="@o">@o</option> }
+                        </select>
+                    }
+                    else
+                    {
+                        <input id="@id" type="@(f.IsSecret ? "password" : "text")" autocomplete="off" disabled="@_busy"
+                               maxlength="@(f.IsSecret ? IntegrationValidation.MaxSecret : IntegrationValidation.MaxValue)"
+                               value="@Value(f)" @oninput="e => SetValue(f, e.Value)"
+                               placeholder="@(f.Placeholder ?? f.Default)" />
+                    }
+                    @if (f.Help is not null) { <span class="muted small">@f.Help</span> }
+                </div>
+            }
+
+            <div class="dialog-actions">
+                <button type="button" class="secondary" @onclick="BackToList" disabled="@_busy">Cancel</button>
+                <button type="button" class="primary" @onclick="Save" disabled="@(_busy || IntegrationValidation.Validate(BuildRequest(), _editing?.SecretsSet) is not null)">
+                    @(_busy ? "Saving…" : "Save")
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private enum View { List, Pick, Form }
+
+    private readonly CancellationTokenSource _cts = new();
+    private View _view = View.List;
+    private List<IntegrationDto> _connections = [];
+    private bool _loading = true, _busy;
+    private string? _error;
+
+    private PlatformDef? _def;
+    private IntegrationDto? _editing;
+    private string _name = "";
+    private readonly Dictionary<string, string> _values = [];
+    private readonly HashSet<string> _replace = [];     // stored secrets the user chose to overwrite
+    private readonly HashSet<string> _clear = [];       // stored optional secrets the user chose to remove
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Reload();
+        _loading = false;
+    }
+
+    private async Task Reload()
+    {
+        try { _connections = await Api.GetIntegrationsAsync(_cts.Token); }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
+    private Task Close() => _busy ? Task.CompletedTask : OnClose.InvokeAsync();
+
+    private void BackToList() { _view = View.List; _error = null; }
+
+    private void StartAdd() { _error = null; _view = View.Pick; }
+
+    private void Edit(IntegrationDto c) => StartForm(IntegrationCatalog.Get(c.Platform), c);
+
+    private void StartForm(PlatformDef def, IntegrationDto? existing)
+    {
+        _error = null;
+        _def = def;
+        _editing = existing;
+        _name = existing?.Name ?? "";
+        _values.Clear(); _replace.Clear(); _clear.Clear();
+        foreach (var f in def.Fields.Where(f => !f.IsSecret))
+            _values[f.Key] = existing is not null ? existing.Settings.GetValueOrDefault(f.Key, "") : f.Default ?? "";
+        _view = View.Form;
+    }
+
+    private void SetValue(FieldDef f, object? v) => _values[f.Key] = v?.ToString() ?? string.Empty;
+
+    private string Value(FieldDef f) => _values.GetValueOrDefault(f.Key, "");
+
+    private bool HasStoredSecret(FieldDef f) => _editing?.SecretsSet.Contains(f.Key) == true && !_clear.Contains(f.Key);
+
+    private void ClearSecret(FieldDef f) { _clear.Add(f.Key); _values[f.Key] = ""; }
+
+    /// <summary>Secrets the user didn't touch are left out, which tells the server to keep what it has.</summary>
+    private IntegrationRequest BuildRequest()
+    {
+        var values = new Dictionary<string, string?>();
+        foreach (var f in _def!.Fields)
+        {
+            if (!f.IsSecret) { values[f.Key] = Value(f); continue; }
+            var stored = _editing?.SecretsSet.Contains(f.Key) == true;
+            if (stored && !_replace.Contains(f.Key) && !_clear.Contains(f.Key)) continue;   // keep
+            values[f.Key] = Value(f);                                                       // "" clears
+        }
+        return new IntegrationRequest(_def.Platform, _name, values);
+    }
+
+    private async Task Save()
+    {
+        var request = BuildRequest();
+        await Run(async () =>
+        {
+            if (_editing is null) await Api.CreateIntegrationAsync(request, _cts.Token);
+            else await Api.UpdateIntegrationAsync(_editing.Id, request, _cts.Token);
+            await Reload();
+            _view = View.List;
+        });
+    }
+
+    private async Task Remove(IntegrationDto c)
+    {
+        if (!await Dialogs.ConfirmAsync("Delete connection", $"Delete “{c.Name}”? Its saved token is removed. Things already pushed to {IntegrationCatalog.Get(c.Platform).Name} are not affected.", "Delete", danger: true)) return;
+        await Run(async () => { await Api.DeleteIntegrationAsync(c.Id, _cts.Token); await Reload(); });
+    }
+
+    private async Task Run(Func<Task> action)
+    {
+        _busy = true; _error = null;
+        try { await action(); }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    /// <summary>The non-secret identifying fields, e.g. "me / repo".</summary>
+    private static string Summary(IntegrationDto c, PlatformDef def) =>
+        string.Join(" · ", def.Fields.Where(f => !f.IsSecret && f.Required && f.Kind != FieldKind.Select)
+            .Select(f => c.Settings.GetValueOrDefault(f.Key)).Where(v => !string.IsNullOrEmpty(v)));
+
+    public void Dispose() { _cts.Cancel(); _cts.Dispose(); }
+}

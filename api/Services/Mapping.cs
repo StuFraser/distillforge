@@ -1,3 +1,4 @@
+using DistillForge.Core.Integrations;
 using DistillForge.Core.Contracts;
 using DistillForge.Data.Entities;
 using CoreSegment = DistillForge.Core.Segmentation.Segment;
@@ -26,6 +27,12 @@ public static class Mapping
     public static AiProviderDto ToDto(this AiProvider p) => new(
         p.Id, p.Name, p.BaseUrl, !string.IsNullOrEmpty(p.ApiKeyEncrypted), p.TimeoutSeconds,
         p.Models.OrderBy(m => m.ModelId).Select(m => m.ToDto()).ToList());
+
+    public static IntegrationDto ToDto(this Integration i) => new(
+        i.Id, i.Platform,
+        i.Name,
+        System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(i.SettingsJson) ?? [],
+        i.SecretKeys, i.CreatedAt);
 
     public static CategoryDto ToDto(this Category c) => new(c.Id, c.Name, c.Colour, c.SortOrder);
 

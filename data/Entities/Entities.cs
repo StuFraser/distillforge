@@ -1,5 +1,6 @@
 using DistillForge.Core.Contracts;
 using DistillForge.Core.Extraction;
+using DistillForge.Core.Integrations;
 using DistillForge.Core.Segmentation;
 
 namespace DistillForge.Data.Entities;
@@ -192,5 +193,24 @@ public class ActionItemLink
     public DuplicateSource Source { get; set; }
     /// <summary>The user said "not a duplicate".</summary>
     public bool Dismissed { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+/// <summary>
+/// A user's connection to an external platform notes can be pushed to (GitHub, Jira…). Non-secret settings are plain JSON;
+/// secrets (tokens) are one encrypted JSON blob (see SecretProtector) and never returned to the client.
+/// </summary>
+public class Integration
+{
+    public Guid Id { get; set; }
+    public Guid? OwnerId { get; set; }
+    public IntegrationPlatform Platform { get; set; }
+    public required string Name { get; set; }
+    /// <summary>JSON object of the platform's non-secret fields, keyed as in IntegrationCatalog.</summary>
+    public string SettingsJson { get; set; } = "{}";
+    /// <summary>Encrypted JSON object of the secret fields; null when there are none.</summary>
+    public string? SecretsEncrypted { get; set; }
+    /// <summary>Which secret fields have a value, so the UI can say "saved" without decrypting anything.</summary>
+    public List<string> SecretKeys { get; set; } = [];
     public DateTimeOffset CreatedAt { get; set; }
 }
