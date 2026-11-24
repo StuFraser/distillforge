@@ -15,12 +15,12 @@ public enum FieldKind
     Url,
     /// <summary>Write-only: encrypted on the server and never sent back to the client.</summary>
     Secret,
-    Select,
 }
 
 /// <param name="Key">Stable identifier used in storage and requests.</param>
-/// <param name="Options">For <see cref="FieldKind.Select"/>: the allowed values.</param>
-/// <param name="Default">Pre-filled on new connections; also used for Select fields left empty.</param>
+/// <param name="Default">Pre-filled on new connections, and used when the field is left empty.</param>
+/// <param name="AllowedHosts">For URL fields the server will call: exact hosts, or suffixes starting with "." (".visualstudio.com").
+/// Stops a saved URL from pointing the server at an internal address.</param>
 public sealed record FieldDef(
     string Key,
     string Label,
@@ -29,7 +29,7 @@ public sealed record FieldDef(
     string? Help = null,
     string? Placeholder = null,
     string? Default = null,
-    IReadOnlyList<string>? Options = null)
+    IReadOnlyList<string>? AllowedHosts = null)
 {
     public bool IsSecret => Kind == FieldKind.Secret;
 }
@@ -67,10 +67,9 @@ public static class IntegrationCatalog
 
         new(IntegrationPlatform.AzureDevOps, "Azure DevOps", "Create a work item in a project for each note.",
         [
-            new("organizationUrl", "Organisation URL", FieldKind.Url, Placeholder: "https://dev.azure.com/your-org"),
-            new("project", "Project", Placeholder: "My Project"),
-            new("workItemType", "Work item type", FieldKind.Select, Default: "Task", Options: ["Task", "Bug", "Issue", "User Story", "Product Backlog Item"],
-                Help: "Must exist in the project's process template."),
+            new("organizationUrl", "Organisation URL", FieldKind.Url, Placeholder: "https://dev.azure.com/your-org",
+                Help: "Azure DevOps Services only (dev.azure.com or your-org.visualstudio.com).", AllowedHosts: ["dev.azure.com", ".visualstudio.com"]),
+            new("project", "Project", Placeholder: "My Project", Help: "The work item type (Task, Bug…) is chosen each time you push."),
             new("pat", "Personal access token", FieldKind.Secret, Help: "Needs the Work Items (Read & write) scope."),
             new("areaPath", "Area path", Required: false, Help: "Leave blank for the project root."),
         ]),
@@ -84,6 +83,8 @@ public static class IntegrationCatalog
             new("issueType", "Issue type", Default: "Task", Help: "Name of an issue type in the project, e.g. Task, Bug, Story."),
         ], "https://id.atlassian.com/manage-profile/security/api-tokens"),
     ];
+
+    public static FieldDef? Field(IntegrationPlatform platform, string key) => Get(platform).Fields.FirstOrDefault(f => f.Key == key);
 
     public static PlatformDef Get(IntegrationPlatform platform) => All.First(p => p.Platform == platform);
 }

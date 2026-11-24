@@ -1,3 +1,4 @@
+using DistillForge.Core.Export;
 using DistillForge.Core.Integrations;
 using System.Net;
 using System.Net.Http.Json;
@@ -107,6 +108,17 @@ public sealed class DistillForgeApi(HttpClient http)
         await Send<IntegrationDto>(() => http.PutAsJsonAsync($"integrations/{id}", r, ct), ct) ?? throw new ApiException("That connection no longer exists.");
 
     public Task DeleteIntegrationAsync(Guid id, CancellationToken ct = default) => Delete($"integrations/{id}", ct);
+
+    // ---- Pushing notes to integrations ----
+
+    public async Task<PushOptionsDto> GetPushOptionsAsync(Guid integrationId, CancellationToken ct = default) =>
+        await Send<PushOptionsDto>(() => http.GetAsync($"integrations/{integrationId}/push-options", ct), ct) ?? throw new ApiException("That connection no longer exists.");
+
+    public async Task<PushResponse> PushNotesAsync(Guid integrationId, PushRequest r, CancellationToken ct = default) =>
+        await Send<PushResponse>(() => http.PostAsJsonAsync($"integrations/{integrationId}/push", r, ct), ct) ?? throw new ApiException("That connection or document no longer exists.");
+
+    public async Task<List<NotePushDto>> GetPushesAsync(Guid workspaceId, CancellationToken ct = default) =>
+        await Send<List<NotePushDto>>(() => http.GetAsync($"workspaces/{workspaceId}/pushes", ct), ct) ?? [];
 
     private async Task Delete(string url, CancellationToken ct)
     {

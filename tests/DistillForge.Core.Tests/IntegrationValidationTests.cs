@@ -46,12 +46,16 @@ public class IntegrationValidationTests
         Assert.NotNull(IntegrationValidation.Validate(Jira("https://x.atlassian.net?a=b")));
     }
 
-    [Fact] public void Select_must_be_a_listed_option()
+    [Fact] public void Azure_DevOps_url_must_be_an_azure_devops_host()
     {
-        IntegrationRequest Ado(string type) => new(IntegrationPlatform.AzureDevOps, "a", new()
-        { ["organizationUrl"] = "https://dev.azure.com/o", ["project"] = "p", ["pat"] = "x", ["workItemType"] = type });
-        Assert.Null(IntegrationValidation.Validate(Ado("Bug")));
-        Assert.NotNull(IntegrationValidation.Validate(Ado("Epic")));
+        IntegrationRequest Ado(string url) => new(IntegrationPlatform.AzureDevOps, "a", new()
+        { ["organizationUrl"] = url, ["project"] = "p", ["pat"] = "x" });
+        Assert.Null(IntegrationValidation.Validate(Ado("https://dev.azure.com/org")));
+        Assert.Null(IntegrationValidation.Validate(Ado("https://org.visualstudio.com")));
+        Assert.NotNull(IntegrationValidation.Validate(Ado("https://visualstudio.com")));
+        Assert.NotNull(IntegrationValidation.Validate(Ado("https://evil.example/dev.azure.com")));
+        Assert.NotNull(IntegrationValidation.Validate(Ado("https://dev.azure.com.evil.example")));
+        Assert.NotNull(IntegrationValidation.Validate(Ado("https://169.254.169.254")));
     }
 
     [Fact] public void CleanSettings_trims_applies_defaults_drops_blanks_and_excludes_secrets()
@@ -64,12 +68,11 @@ public class IntegrationValidationTests
         Assert.DoesNotContain("apiToken", s.Keys);
     }
 
-    [Fact] public void Every_platform_has_unique_field_keys_and_selects_have_options()
+    [Fact] public void Every_platform_has_unique_field_keys()
     {
         foreach (var p in IntegrationCatalog.All)
         {
             Assert.Equal(p.Fields.Count, p.Fields.Select(f => f.Key).Distinct().Count());
-            Assert.All(p.Fields.Where(f => f.Kind == FieldKind.Select), f => Assert.NotEmpty(f.Options!));
         }
         Assert.Equal(Enum.GetValues<IntegrationPlatform>().Length, IntegrationCatalog.All.Count);
     }

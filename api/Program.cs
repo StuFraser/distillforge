@@ -1,5 +1,6 @@
 using DistillForge.Api.Ai;
 using DistillForge.Api.Auth;
+using DistillForge.Api.Export;
 using DistillForge.Api.Services;
 using DistillForge.Data;
 using DistillForge.Data.Security;
@@ -43,6 +44,10 @@ builder.Services.AddDbContext<DistillForgeDbContext>(o => o.UseNpgsql(connection
 builder.Services.Configure<AiProviderOptions>(builder.Configuration.GetSection(AiProviderOptions.Section));
 builder.Services.AddSingleton(new SecretProtector(builder.Configuration["Encryption:Key"] ?? builder.Configuration["Encryption__Key"]));
 builder.Services.AddHttpClient();
+// Export targets send saved tokens to user-configured URLs: never follow redirects (a redirect could carry the token elsewhere).
+builder.Services.AddHttpClient(AzureDevOpsTarget.HttpClientName)
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton<IExportTarget, AzureDevOpsTarget>();
 builder.Services.AddScoped<AiConfigResolver>();
 builder.Services.AddSingleton<ActionExtractorFactory>();
 

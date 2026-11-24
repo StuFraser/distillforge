@@ -1,4 +1,3 @@
-@using DistillForge.Core.Integrations
 @inject DistillForgeApi Api
 @inject DialogService Dialogs
 @implements IDisposable
@@ -87,12 +86,6 @@
                             <button type="button" class="link" @onclick="() => _replace.Add(f.Key)">Replace</button>
                             @if (!f.Required) { <button type="button" class="link" @onclick="() => ClearSecret(f)">Remove</button> }
                         </div>
-                    }
-                    else if (f.Kind == FieldKind.Select)
-                    {
-                        <select id="@id" value="@Value(f)" @onchange="e => SetValue(f, e.Value)" disabled="@_busy">
-                            @foreach (var o in f.Options!) { <option value="@o">@o</option> }
-                        </select>
                     }
                     else
                     {
@@ -215,7 +208,7 @@
 
     /// <summary>The non-secret identifying fields, e.g. "me / repo".</summary>
     private static string Summary(IntegrationDto c, PlatformDef def) =>
-        string.Join(" · ", def.Fields.Where(f => !f.IsSecret && f.Required && f.Kind != FieldKind.Select)
+        string.Join(" · ", def.Fields.Where(f => !f.IsSecret && f.Required)
             .Select(f => c.Settings.GetValueOrDefault(f.Key)).Where(v => !string.IsNullOrEmpty(v)));
 
     public void Dispose() { _cts.Cancel(); _cts.Dispose(); }

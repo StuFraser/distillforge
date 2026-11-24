@@ -16,6 +16,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
     public DbSet<AiProvider> AiProviders => Set<AiProvider>();
     public DbSet<AiModel> AiModels => Set<AiModel>();
     public DbSet<Integration> Integrations => Set<Integration>();
+    public DbSet<NotePush> NotePushes => Set<NotePush>();
 
     /// <summary>
     /// The signed-in user this context acts for. Set once per request by the auth middleware (or by the queue runner, to the
@@ -41,7 +42,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
     {
         foreach (var entry in ChangeTracker.Entries().Where(e => e.State == EntityState.Added))
         {
-            if (entry.Entity is not (Workspace or AiProvider or AiModel or Integration)) continue;
+            if (entry.Entity is not (Workspace or AiProvider or AiModel or Integration or NotePush)) continue;
             var owner = entry.Property("OwnerId");
             if (owner.CurrentValue is not null) continue;
             owner.CurrentValue = CurrentUserId
@@ -66,6 +67,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
         b.Entity<AiProvider>().HasQueryFilter(p => CurrentUserId != null && p.OwnerId == CurrentUserId);
         b.Entity<AiModel>().HasQueryFilter(m => CurrentUserId != null && m.OwnerId == CurrentUserId);
         b.Entity<Integration>().HasQueryFilter(i => CurrentUserId != null && i.OwnerId == CurrentUserId);
+        b.Entity<NotePush>().HasQueryFilter(p => CurrentUserId != null && p.OwnerId == CurrentUserId);
         b.Entity<Segment>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
         b.Entity<Category>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
         b.Entity<ActionItem>().HasQueryFilter(x => CurrentUserId != null && x.Workspace!.OwnerId == CurrentUserId);
@@ -168,6 +170,18 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             e.Property(x => x.Platform).HasConversion<string>().HasMaxLength(32);
             e.Property(x => x.SecretsEncrypted).HasMaxLength(8000);
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.OwnerId);
+        });
+
+        b.Entity<NotePush>(e =>
+        {
+            e.Property(x => x.ExternalId).HasMaxLength(200);
+            e.Property(x => x.ExternalUrl).HasMaxLength(1000);
+            e.Property(x => x.ItemType).HasMaxLength(200);
+            e.HasOne<ActionItem>().WithMany().HasForeignKey(x => x.ActionItemId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Integration>().WithMany().HasForeignKey(x => x.IntegrationId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => new { x.ActionItemId, x.IntegrationId });
             e.HasIndex(x => x.OwnerId);
         });
     }

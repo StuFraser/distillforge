@@ -54,7 +54,7 @@ public static class IntegrationValidation
             }
             if (v.Length > MaxValue) return $"{f.Label} is too long (max {MaxValue} characters).";
             if (f.Kind == FieldKind.Url && UrlError(v) is { } urlError) return $"{f.Label}: {urlError}";
-            if (f.Kind == FieldKind.Select && f.Options?.Contains(v) != true) return $"{f.Label} must be one of: {string.Join(", ", f.Options ?? [])}.";
+            if (f.AllowedHosts is not null && !HostAllowed(v, f.AllowedHosts)) return $"{f.Label}: host must be {string.Join(" or ", f.AllowedHosts.Select(h => h.StartsWith('.') ? "*" + h : h))}.";
         }
         return null;
     }
@@ -72,6 +72,14 @@ public static class IntegrationValidation
             result[f.Key] = f.Kind == FieldKind.Url ? v.TrimEnd('/') : v;
         }
         return result;
+    }
+
+    /// <summary>True when the URL's host equals an allowed host or ends with an allowed ".suffix".</summary>
+    public static bool HostAllowed(string url, IReadOnlyList<string> allowed)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return false;
+        var host = u.IdnHost.ToLowerInvariant();
+        return allowed.Any(a => a.StartsWith('.') ? host.EndsWith(a, StringComparison.Ordinal) && host.Length > a.Length : host == a);
     }
 
     private static string? UrlError(string v) =>

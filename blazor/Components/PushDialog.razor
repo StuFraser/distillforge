@@ -1,0 +1,193 @@
+@inject DistillForgeApi Api
+@implements IDisposable
+
+<div class="dialog-backdrop" @onclick="Close">
+    <div class="dialog ai-dialog" role="dialog" aria-modal="true" aria-labelledby="push-title" @onclick:stopPropagation="true">
+        <h2 id="push-title">Push “@CategoryName”</h2>
+
+        @if (_error is not null)
+        {
+            <p class="warning error" role="alert">@_error</p>
+        }
+
+        @if (_loading)
+        {
+            <p class="muted">Loading…</p>
+        }
+        else if (_connections.Count == 0)
+        {
+            <p class="empty-hint">
+                No connection to push to yet. Add an Azure DevOps connection with the 🔌 button in the banner, then come back.
+            </p>
+            <div class="dialog-actions"><button type="button" class="primary" @onclick="Close">Close</button></div>
+        }
+        else if (_results is not null)
+        {
+            var created = _results.Count(o => o.Ok);
+            <p class="@(created == _results.Count ? "ok-note" : "warning")">
+                Created @created of @_results.Count item@(_results.Count == 1 ? "" : "s") in @Connection!.Name.
+            </p>
+            <ul class="push-results">
+                @foreach (var o in _results)
+                {
+                    <li>
+                        <span>@TitleOf(o.NoteId)</span>
+                        @if (o.Ok)
+                        {
+                            @if (o.Url is not null) { <a href="@o.Url" target="_blank" rel="noopener noreferrer">#@o.ExternalId ↗</a> }
+                            else { <span class="muted">#@o.ExternalId</span> }
+                        }
+                        else if (o.Error == "Already pushed.")
+                        {
+                            <span class="muted">skipped (already pushed)</span>
+                        }
+                        else
+                        {
+                            <span class="push-error">@o.Error</span>
+                        }
+                    </li>
+                }
+            </ul>
+            <div class="dialog-actions"><button type="button" class="primary" @onclick="Close">Done</button></div>
+        }
+        else
+        {
+            <label for="push-conn">Push to</label>
+            <select id="push-conn" value="@_connectionId" @onchange="OnConnectionChanged" disabled="@_busy">
+                @foreach (var c in _connections)
+                {
+                    <option value="@c.Id">@c.Name (@IntegrationCatalog.Get(c.Platform).Name)</option>
+                }
+            </select>
+
+            <label for="push-type">Create each note as</label>
+            @if (_optionsLoading)
+            {
+                <select id="push-type" disabled><option>Loading types…</option></select>
+            }
+            else
+            {
+                <select id="push-type" @bind="_itemType" disabled="@(_busy || _options is not { Error: null })">
+                    @foreach (var t in _options?.ItemTypes ?? []) { <option value="@t">@t</option> }
+                </select>
+            }
+            @if (_options?.Error is not null)
+            {
+                <p class="warning error" role="alert">@_options.Error</p>
+            }
+
+            <div>
+                <span class="field-label">Notes (@_chosen.Count of @Notes.Count)</span>
+                <ul class="share-notes">
+                    @foreach (var n in Notes)
+                    {
+                        var prior = PriorPush(n.Id);
+                        <li>
+                            <label>
+                                <input type="checkbox" checked="@_chosen.Contains(n.Id)" disabled="@_busy" @onchange="e => Toggle(n.Id, (bool)e.Value!)" />
+                                @n.Title
+                            </label>
+                            @if (prior is not null)
+                            {
+                                <span class="muted small">pushed
+                                    @if (prior.Url is not null) { <a href="@prior.Url" target="_blank" rel="noopener noreferrer">#@prior.ExternalId</a> } else { <text>#@prior.ExternalId</text> }
+                                </span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+
+            <label class="check"><input type="checkbox" @bind="_includeSource" disabled="@_busy" /> Include the source quote</label>
+            @if (Notes.Any(n => PriorPush(n.Id) is not null))
+            {
+                <label class="check"><input type="checkbox" @bind="_repush" disabled="@_busy" /> Push again even if already pushed (creates duplicates)</label>
+            }
+            <p class="muted small">
+                Owner and due date go into the description. The category name is added as a tag.
+            </p>
+
+            <div class="dialog-actions">
+                <button type="button" class="secondary" @onclick="Close" disabled="@_busy">Cancel</button>
+                <button type="button" class="primary" @onclick="PushAsync" disabled="@(_busy || _chosen.Count == 0 || _options is not { Error: null } || string.IsNullOrEmpty(_itemType))">
+                    @(_busy ? "Pushing…" : $"Push {_chosen.Count} note{(_chosen.Count == 1 ? "" : "s")}")
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid WorkspaceId { get; set; }
+    [Parameter, EditorRequired] public string WorkspaceTitle { get; set; } = "";
+    [Parameter, EditorRequired] public string CategoryName { get; set; } = "";
+    /// <summary>The category's notes, merged ones already removed.</summary>
+    [Parameter, EditorRequired] public List<ActionItemDto> Notes { get; set; } = [];
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private readonly CancellationTokenSource _cts = new();
+    private List<IntegrationDto> _connections = [];
+    private List<NotePushDto> _pushes = [];
+    private readonly HashSet<Guid> _chosen = [];
+    private Guid _connectionId;
+    private PushOptionsDto? _options;
+    private string _itemType = "";
+    private bool _loading = true, _optionsLoading, _busy, _includeSource = true, _repush;
+    private string? _error;
+    private List<PushOutcome>? _results;
+
+    private IntegrationDto? Connection => _connections.FirstOrDefault(c => c.Id == _connectionId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _connections = (await Api.GetIntegrationsAsync(_cts.Token)).Where(c => PushSupport.IsSupported(c.Platform)).ToList();
+            _pushes = await Api.GetPushesAsync(WorkspaceId, _cts.Token);
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        _loading = false;
+        if (_connections.Count > 0) await SelectConnection(_connections[0].Id);
+    }
+
+    private Task OnConnectionChanged(ChangeEventArgs e) => SelectConnection(Guid.Parse(e.Value!.ToString()!));
+
+    private async Task SelectConnection(Guid id)
+    {
+        _connectionId = id;
+        _options = null; _itemType = ""; _error = null; _optionsLoading = true;
+        _chosen.Clear();
+        foreach (var n in Notes.Where(n => PriorPush(n.Id) is null)) _chosen.Add(n.Id);   // already-pushed notes start unticked
+        try
+        {
+            _options = await Api.GetPushOptionsAsync(id, _cts.Token);
+            _itemType = _options.DefaultItemType ?? "";
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        _optionsLoading = false;
+    }
+
+    private NotePushDto? PriorPush(Guid noteId) => _pushes.FirstOrDefault(p => p.NoteId == noteId && p.IntegrationId == _connectionId);
+
+    private void Toggle(Guid id, bool on) { if (on) _chosen.Add(id); else _chosen.Remove(id); }
+
+    private string TitleOf(Guid id) => Notes.FirstOrDefault(n => n.Id == id)?.Title ?? "(note)";
+
+    private async Task PushAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var ids = Notes.Where(n => _chosen.Contains(n.Id)).Select(n => n.Id).ToList();   // board order
+            var response = await Api.PushNotesAsync(_connectionId, new PushRequest(WorkspaceId, ids, _itemType, _includeSource, _repush), _cts.Token);
+            _results = response.Outcomes.ToList();
+            _pushes = await Api.GetPushesAsync(WorkspaceId, _cts.Token);
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private Task Close() => _busy ? Task.CompletedTask : OnClose.InvokeAsync();
+
+    public void Dispose() { _cts.Cancel(); _cts.Dispose(); }
+}

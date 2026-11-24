@@ -433,6 +433,49 @@ namespace DistillForge.Data.Migrations
                     b.ToTable("Integrations");
                 });
 
+            modelBuilder.Entity("DistillForge.Data.Entities.NotePush", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActionItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ExternalUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("IntegrationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ItemType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("PushedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IntegrationId");
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("ActionItemId", "IntegrationId");
+
+                    b.ToTable("NotePushes");
+                });
+
             modelBuilder.Entity("DistillForge.Data.Entities.Segment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -629,6 +672,26 @@ namespace DistillForge.Data.Migrations
 
             modelBuilder.Entity("DistillForge.Data.Entities.Integration", b =>
                 {
+                    b.HasOne("DistillForge.Data.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("DistillForge.Data.Entities.NotePush", b =>
+                {
+                    b.HasOne("DistillForge.Data.Entities.ActionItem", null)
+                        .WithMany()
+                        .HasForeignKey("ActionItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DistillForge.Data.Entities.Integration", null)
+                        .WithMany()
+                        .HasForeignKey("IntegrationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("DistillForge.Data.Entities.AppUser", null)
                         .WithMany()
                         .HasForeignKey("OwnerId")

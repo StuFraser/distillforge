@@ -214,3 +214,17 @@ public class Integration
     public List<string> SecretKeys { get; set; } = [];
     public DateTimeOffset CreatedAt { get; set; }
 }
+
+/// <summary>Records that a note was pushed through a connection, so a second push can skip it and the UI can link to the result.</summary>
+public class NotePush
+{
+    public Guid Id { get; set; }
+    public Guid? OwnerId { get; set; }
+    public Guid ActionItemId { get; set; }
+    public Guid IntegrationId { get; set; }
+    /// <summary>The platform's id for what was created (e.g. the work item number).</summary>
+    public required string ExternalId { get; set; }
+    public string? ExternalUrl { get; set; }
+    public required string ItemType { get; set; }
+    public DateTimeOffset PushedAt { get; set; }
+}
