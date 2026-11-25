@@ -49,7 +49,7 @@ public class IntegrationValidationTests
     [Fact] public void Azure_DevOps_url_must_be_an_azure_devops_host()
     {
         IntegrationRequest Ado(string url) => new(IntegrationPlatform.AzureDevOps, "a", new()
-        { ["organizationUrl"] = url, ["project"] = "p", ["pat"] = "x" });
+        { ["organizationUrl"] = url, ["pat"] = "x" });
         Assert.Null(IntegrationValidation.Validate(Ado("https://dev.azure.com/org")));
         Assert.Null(IntegrationValidation.Validate(Ado("https://org.visualstudio.com")));
         Assert.NotNull(IntegrationValidation.Validate(Ado("https://visualstudio.com")));

@@ -69,9 +69,9 @@ public static class IntegrationCatalog
         [
             new("organizationUrl", "Organisation URL", FieldKind.Url, Placeholder: "https://dev.azure.com/your-org",
                 Help: "Azure DevOps Services only (dev.azure.com or your-org.visualstudio.com).", AllowedHosts: ["dev.azure.com", ".visualstudio.com"]),
-            new("project", "Project", Placeholder: "My Project", Help: "The work item type (Task, Bug…) is chosen each time you push."),
+            new("project", "Default project", Required: false, Placeholder: "My Project",
+                Help: "Pre-selected when you push. The project, work item type and area path are chosen each time."),
             new("pat", "Personal access token", FieldKind.Secret, Help: "Needs the Work Items (Read & write) scope."),
-            new("areaPath", "Area path", Required: false, Help: "Leave blank for the project root."),
         ]),
 
         new(IntegrationPlatform.Jira, "Jira", "Create an issue in a project for each note (Jira Cloud).",

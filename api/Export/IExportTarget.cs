@@ -15,11 +15,17 @@ public interface IExportTarget
 {
     IntegrationPlatform Platform { get; }
 
-    /// <summary>Choices for the push dialog. Failures come back in <see cref="PushOptionsDto.Error"/> rather than throwing.</summary>
-    Task<PushOptionsDto> GetOptionsAsync(TargetConnection connection, CancellationToken ct);
+    /// <summary>What the level above an item is called ("Project"), or null when the platform has none.</summary>
+    string? ScopeLabel { get; }
+
+    /// <summary>
+    /// Choices for the push dialog. With no <paramref name="scope"/> it also lists the scopes and picks one; with one it only
+    /// lists that scope's item types. Failures come back in <see cref="PushOptionsDto.Error"/> rather than throwing.
+    /// </summary>
+    Task<PushOptionsDto> GetOptionsAsync(TargetConnection connection, string? scope, CancellationToken ct);
 
     /// <summary>Creates one item. A failure specific to this note returns Ok=false; a failure that would hit every note (bad token) throws <see cref="ExportAuthException"/>.</summary>
-    Task<PushOutcome> PushAsync(TargetConnection connection, ExportItem item, string itemType, CancellationToken ct);
+    Task<PushOutcome> PushAsync(TargetConnection connection, ExportItem item, PushChoices choices, CancellationToken ct);
 }
 
 /// <summary>The platform rejected the credentials or the connection's target doesn't exist, so trying further notes is pointless.</summary>

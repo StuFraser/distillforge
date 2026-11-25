@@ -60,6 +60,14 @@
                 }
             </select>
 
+            @if (_options?.ScopeLabel is { } scopeLabel)
+            {
+                <label for="push-scope">@scopeLabel</label>
+                <select id="push-scope" value="@_scope" @onchange="OnScopeChanged" disabled="@(_busy || _optionsLoading || _options.Scopes is not { Count: > 0 })">
+                    @foreach (var sc in _scopes) { <option value="@sc">@sc</option> }
+                </select>
+            }
+
             <label for="push-type">Create each note as</label>
             @if (_optionsLoading)
             {
@@ -74,6 +82,12 @@
             @if (_options?.Error is not null)
             {
                 <p class="warning error" role="alert">@_options.Error</p>
+            }
+
+            @if (_options?.ScopeLabel is not null)
+            {
+                <label for="push-area">Area path <span class="muted small">(optional)</span></label>
+                <input id="push-area" type="text" maxlength="500" @bind="_areaPath" @bind:event="oninput" disabled="@_busy" placeholder="@(_scope + "\\Team")" autocomplete="off" />
             }
 
             <div>
@@ -131,6 +145,8 @@
     private readonly HashSet<Guid> _chosen = [];
     private Guid _connectionId;
     private PushOptionsDto? _options;
+    private List<string> _scopes = [];
+    private string _scope = "", _areaPath = "";
     private string _itemType = "";
     private bool _loading = true, _optionsLoading, _busy, _includeSource = true, _repush;
     private string? _error;
@@ -155,19 +171,44 @@
     private async Task SelectConnection(Guid id)
     {
         _connectionId = id;
-        _options = null; _itemType = ""; _error = null; _optionsLoading = true;
-        _chosen.Clear();
-        foreach (var n in Notes.Where(n => PriorPush(n.Id) is null)) _chosen.Add(n.Id);   // already-pushed notes start unticked
+        _options = null; _itemType = ""; _scope = ""; _scopes = []; _error = null; _optionsLoading = true;
         try
         {
-            _options = await Api.GetPushOptionsAsync(id, _cts.Token);
+            _options = await Api.GetPushOptionsAsync(id, null, _cts.Token);
+            _scopes = _options.Scopes?.ToList() ?? [];
+            _scope = _options.Scope ?? "";
             _itemType = _options.DefaultItemType ?? "";
         }
         catch (ApiException ex) { _error = ex.Message; }
         _optionsLoading = false;
+        ResetChosen();
     }
 
-    private NotePushDto? PriorPush(Guid noteId) => _pushes.FirstOrDefault(p => p.NoteId == noteId && p.IntegrationId == _connectionId);
+    private async Task OnScopeChanged(ChangeEventArgs e)
+    {
+        var scope = e.Value?.ToString() ?? "";
+        var previous = _itemType;
+        _scope = scope; _error = null; _optionsLoading = true;
+        try
+        {
+            var options = await Api.GetPushOptionsAsync(_connectionId, scope, _cts.Token);
+            // Keep the project list we already have; the answer only carries the new project's types.
+            _options = options with { Scopes = _scopes };
+            _itemType = options.ItemTypes.Contains(previous) ? previous : options.DefaultItemType ?? "";
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        _optionsLoading = false;
+        ResetChosen();
+    }
+
+    /// <summary>Notes already pushed to the current connection and project start unticked.</summary>
+    private void ResetChosen()
+    {
+        _chosen.Clear();
+        foreach (var n in Notes.Where(n => PriorPush(n.Id) is null)) _chosen.Add(n.Id);
+    }
+
+    private NotePushDto? PriorPush(Guid noteId) => _pushes.FirstOrDefault(p => p.NoteId == noteId && p.IntegrationId == _connectionId && (p.Scope ?? "") == _scope);
 
     private void Toggle(Guid id, bool on) { if (on) _chosen.Add(id); else _chosen.Remove(id); }
 
@@ -179,7 +220,8 @@
         try
         {
             var ids = Notes.Where(n => _chosen.Contains(n.Id)).Select(n => n.Id).ToList();   // board order
-            var response = await Api.PushNotesAsync(_connectionId, new PushRequest(WorkspaceId, ids, _itemType, _includeSource, _repush), _cts.Token);
+            var response = await Api.PushNotesAsync(_connectionId, new PushRequest(WorkspaceId, ids, _itemType, _includeSource, _repush,
+                string.IsNullOrEmpty(_scope) ? null : _scope, string.IsNullOrWhiteSpace(_areaPath) ? null : _areaPath.Trim()), _cts.Token);
             _results = response.Outcomes.ToList();
             _pushes = await Api.GetPushesAsync(WorkspaceId, _cts.Token);
         }

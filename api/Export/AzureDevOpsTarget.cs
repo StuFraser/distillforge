@@ -15,12 +15,27 @@ public sealed class AzureDevOpsTarget(IHttpClientFactory httpFactory) : IExportT
     public const int MaxTitle = 255, MaxQuote = 600;
 
     public IntegrationPlatform Platform => IntegrationPlatform.AzureDevOps;
+    public string? ScopeLabel => "Project";
 
-    public async Task<PushOptionsDto> GetOptionsAsync(TargetConnection c, CancellationToken ct)
+    public async Task<PushOptionsDto> GetOptionsAsync(TargetConnection c, string? scope, CancellationToken ct)
     {
         try
         {
-            using var request = Build(c, HttpMethod.Get, $"_apis/wit/workitemtypes?api-version={ApiVersion}");
+            IReadOnlyList<string>? projects = null;
+            var chosen = scope?.Trim();
+            if (string.IsNullOrEmpty(chosen))
+            {
+                var fallback = c.Setting("project");
+                try { projects = await ListProjectsAsync(c, ct); }
+                catch (ExportAuthException) when (fallback.Length > 0)
+                {
+                    projects = [fallback];   // the token can't list projects (no Project and Team scope), but a default is saved
+                }
+                if (projects.Count == 0) return new([], null, "No projects were found in the organisation.", ScopeLabel);
+                chosen = projects.Contains(fallback) ? fallback : projects[0];
+            }
+
+            using var request = Build(c, HttpMethod.Get, chosen, $"_apis/wit/workitemtypes?api-version={ApiVersion}");
             var json = await SendAsync(request, ct);
             var types = (json?["value"] as JsonArray ?? [])
                 .Where(t => t?["isDisabled"]?.GetValue<bool>() != true)
@@ -29,22 +44,35 @@ public sealed class AzureDevOpsTarget(IHttpClientFactory httpFactory) : IExportT
                 .Select(n => n!)
                 .Order(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            if (types.Count == 0) return new([], null, "The project has no work item types available.");
-            return new(types, types.Contains("Task") ? "Task" : types[0], null);
+            if (types.Count == 0) return new([], null, $"“{chosen}” has no work item types available.", ScopeLabel, projects, chosen);
+            return new(types, types.Contains("Task") ? "Task" : types[0], null, ScopeLabel, projects, chosen);
         }
-        catch (ExportAuthException ex) { return new([], null, ex.Message); }
+        catch (ExportAuthException ex) { return new([], null, ex.Message, ScopeLabel); }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {
-            return new([], null, $"Couldn't reach Azure DevOps: {ex.Message}");
+            return new([], null, $"Couldn't reach Azure DevOps: {ex.Message}", ScopeLabel);
         }
     }
 
-    public async Task<PushOutcome> PushAsync(TargetConnection c, ExportItem item, string itemType, CancellationToken ct)
+    private async Task<IReadOnlyList<string>> ListProjectsAsync(TargetConnection c, CancellationToken ct)
     {
+        using var request = Build(c, HttpMethod.Get, null, $"_apis/projects?api-version={ApiVersion}&$top=500");
+        var json = await SendAsync(request, ct);
+        return (json?["value"] as JsonArray ?? [])
+            .Select(p => p?["name"]?.GetValue<string>())
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Select(n => n!)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public async Task<PushOutcome> PushAsync(TargetConnection c, ExportItem item, PushChoices choices, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(choices.Scope)) return new(item.NoteId, false, null, null, "Choose a project.");
         try
         {
-            using var request = Build(c, HttpMethod.Post, $"_apis/wit/workitems/${Uri.EscapeDataString(itemType)}?api-version={ApiVersion}");
-            request.Content = new StringContent(BuildPatch(item, itemType, c.Setting("areaPath")).ToJsonString(), Encoding.UTF8, "application/json-patch+json");
+            using var request = Build(c, HttpMethod.Post, choices.Scope.Trim(), $"_apis/wit/workitems/${Uri.EscapeDataString(choices.ItemType)}?api-version={ApiVersion}");
+            request.Content = new StringContent(BuildPatch(item, choices.AreaPath).ToJsonString(), Encoding.UTF8, "application/json-patch+json");
             var json = await SendAsync(request, ct);
             var id = json?["id"]?.ToString();
             var url = json?["_links"]?["html"]?["href"]?.GetValue<string>();
@@ -61,7 +89,7 @@ public sealed class AzureDevOpsTarget(IHttpClientFactory httpFactory) : IExportT
     }
 
     /// <summary>JSON Patch document for a new work item. Public so the field mapping can be tested without HTTP.</summary>
-    public static JsonArray BuildPatch(ExportItem item, string itemType, string? areaPath)
+    public static JsonArray BuildPatch(ExportItem item, string? areaPath)
     {
         var ops = new JsonArray { Add("System.Title", Clip(Collapse(item.Title), MaxTitle)), Add("System.Description", BuildDescriptionHtml(item)) };
         if (!string.IsNullOrWhiteSpace(areaPath)) ops.Add(Add("System.AreaPath", areaPath.Trim()));
@@ -93,15 +121,17 @@ public sealed class AzureDevOpsTarget(IHttpClientFactory httpFactory) : IExportT
         return sb.ToString();
     }
 
-    private HttpRequestMessage Build(TargetConnection c, HttpMethod method, string relative)
+    /// <param name="project">Null for organisation-level calls (listing projects).</param>
+    private HttpRequestMessage Build(TargetConnection c, HttpMethod method, string? project, string relative)
     {
         var org = c.Setting("organizationUrl").TrimEnd('/');
         var field = IntegrationCatalog.Field(IntegrationPlatform.AzureDevOps, "organizationUrl");
         // Re-checked here, not just when saved: the server must never call a host that isn't Azure DevOps.
         if (!IntegrationValidation.HostAllowed(org, field!.AllowedHosts!))
             throw new ExportAuthException("The organisation URL isn't an Azure DevOps address. Edit the connection.");
-        var project = Uri.EscapeDataString(c.Setting("project"));
-        var request = new HttpRequestMessage(method, $"{org}/{project}/{relative}");
+        // The project name comes from the client, so it is escaped into a single path segment and can't redirect the call elsewhere.
+        var prefix = project is null ? org : $"{org}/{Uri.EscapeDataString(project)}";
+        var request = new HttpRequestMessage(method, $"{prefix}/{relative}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes(":" + c.Secret("pat"))));
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return request;
@@ -118,7 +148,7 @@ public sealed class AzureDevOpsTarget(IHttpClientFactory httpFactory) : IExportT
         if (response.StatusCode is HttpStatusCode.NonAuthoritativeInformation or HttpStatusCode.Unauthorized or HttpStatusCode.Found or HttpStatusCode.Redirect)
             throw new ExportAuthException("Azure DevOps rejected the token. Check it hasn't expired and belongs to this organisation.");
         if (response.StatusCode == HttpStatusCode.Forbidden)
-            throw new ExportAuthException("The token isn't allowed to do that. It needs the Work Items (Read & write) scope.");
+            throw new ExportAuthException("The token isn't allowed to do that. It needs the Project and Team (Read) and Work Items (Read & write) scopes.");
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new ExportAuthException("Azure DevOps couldn't find that organisation or project. Check the connection's URL and project name.");
         if (!response.IsSuccessStatusCode)

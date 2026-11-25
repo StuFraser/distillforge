@@ -178,6 +178,7 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
             e.Property(x => x.ExternalId).HasMaxLength(200);
             e.Property(x => x.ExternalUrl).HasMaxLength(1000);
             e.Property(x => x.ItemType).HasMaxLength(200);
+            e.Property(x => x.Scope).HasMaxLength(200);
             e.HasOne<ActionItem>().WithMany().HasForeignKey(x => x.ActionItemId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<Integration>().WithMany().HasForeignKey(x => x.IntegrationId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);

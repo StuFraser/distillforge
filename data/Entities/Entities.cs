@@ -226,5 +226,7 @@ public class NotePush
     public required string ExternalId { get; set; }
     public string? ExternalUrl { get; set; }
     public required string ItemType { get; set; }
+    /// <summary>The project (or equivalent) it was pushed to; null for platforms without one.</summary>
+    public string? Scope { get; set; }
     public DateTimeOffset PushedAt { get; set; }
 }

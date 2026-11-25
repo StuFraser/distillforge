@@ -20,7 +20,7 @@ public sealed class PushFunctions(DistillForgeDbContext db, SecretProtector secr
     {
         var resolved = await Resolve(id, ct);
         if (resolved.Error is not null) return resolved.Error;
-        return new OkObjectResult(await resolved.Target!.GetOptionsAsync(resolved.Connection!, ct));
+        return new OkObjectResult(await resolved.Target!.GetOptionsAsync(resolved.Connection!, req.Query["scope"].ToString(), ct));
     }
 
     [Function("PushNotes")]
@@ -37,6 +37,11 @@ public sealed class PushFunctions(DistillForgeDbContext db, SecretProtector secr
         var resolved = await Resolve(id, ct);
         if (resolved.Error is not null) return resolved.Error;
 
+        var scope = string.IsNullOrWhiteSpace(body.Scope) ? null : body.Scope.Trim();
+        if (resolved.Target!.ScopeLabel is { } label && scope is null) return new BadRequestObjectResult($"Choose a {label.ToLowerInvariant()}.");
+        if (scope is { Length: > 200 } || body.AreaPath is { Length: > 500 }) return new BadRequestObjectResult("The project or area path is too long.");
+        var choices = new PushChoices(body.ItemType.Trim(), scope, string.IsNullOrWhiteSpace(body.AreaPath) ? null : body.AreaPath.Trim());
+
         var workspace = await db.Workspaces.AsNoTracking().FirstOrDefaultAsync(w => w.Id == body.WorkspaceId, ct);
         if (workspace is null) return new NotFoundResult();
 
@@ -44,7 +49,7 @@ public sealed class PushFunctions(DistillForgeDbContext db, SecretProtector secr
             .Include(a => a.Category).Include(a => a.Evidence).ThenInclude(e => e.Segment)
             .Where(a => a.WorkspaceId == workspace.Id && a.MergedIntoId == null && noteIds.Contains(a.Id))
             .ToListAsync(ct)).ToDictionary(a => a.Id);
-        var already = (await db.NotePushes.Where(p => p.IntegrationId == id && noteIds.Contains(p.ActionItemId)).ToListAsync(ct))
+        var already = (await db.NotePushes.Where(p => p.IntegrationId == id && p.Scope == scope && noteIds.Contains(p.ActionItemId)).ToListAsync(ct))
             .GroupBy(p => p.ActionItemId).ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.PushedAt).First());
 
         var outcomes = new List<PushOutcome>();
@@ -61,13 +66,13 @@ public sealed class PushFunctions(DistillForgeDbContext db, SecretProtector secr
 
             try
             {
-                var outcome = await resolved.Target!.PushAsync(resolved.Connection!, ToItem(note, workspace.Title, body.IncludeSource), body.ItemType.Trim(), ct);
+                var outcome = await resolved.Target!.PushAsync(resolved.Connection!, ToItem(note, workspace.Title, body.IncludeSource), choices, ct);
                 outcomes.Add(outcome);
                 if (outcome.Ok)
                     db.NotePushes.Add(new NotePush
                     {
                         Id = Guid.NewGuid(), ActionItemId = noteId, IntegrationId = id, ExternalId = outcome.ExternalId!,
-                        ExternalUrl = outcome.Url, ItemType = body.ItemType.Trim(), PushedAt = DateTimeOffset.UtcNow,
+                        ExternalUrl = outcome.Url, ItemType = choices.ItemType, Scope = scope, PushedAt = DateTimeOffset.UtcNow,
                     });
             }
             catch (ExportAuthException ex)
@@ -88,7 +93,7 @@ public sealed class PushFunctions(DistillForgeDbContext db, SecretProtector secr
         var noteIds = db.ActionItems.Where(a => a.WorkspaceId == id).Select(a => a.Id);
         var rows = await db.NotePushes.AsNoTracking().Where(p => noteIds.Contains(p.ActionItemId)).ToListAsync(ct);
         return new OkObjectResult(rows.OrderByDescending(p => p.PushedAt)
-            .Select(p => new NotePushDto(p.ActionItemId, p.IntegrationId, p.ExternalId, p.ExternalUrl, p.ItemType, p.PushedAt)));
+            .Select(p => new NotePushDto(p.ActionItemId, p.IntegrationId, p.ExternalId, p.ExternalUrl, p.ItemType, p.PushedAt, p.Scope)));
     }
 
     private static PushOutcome Fail(Guid noteId, string error) => new(noteId, false, null, null, error);

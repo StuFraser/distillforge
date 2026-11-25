@@ -111,8 +111,9 @@ public sealed class DistillForgeApi(HttpClient http)
 
     // ---- Pushing notes to integrations ----
 
-    public async Task<PushOptionsDto> GetPushOptionsAsync(Guid integrationId, CancellationToken ct = default) =>
-        await Send<PushOptionsDto>(() => http.GetAsync($"integrations/{integrationId}/push-options", ct), ct) ?? throw new ApiException("That connection no longer exists.");
+    /// <summary>With no scope, also returns the scopes (projects) to choose from.</summary>
+    public async Task<PushOptionsDto> GetPushOptionsAsync(Guid integrationId, string? scope = null, CancellationToken ct = default) =>
+        await Send<PushOptionsDto>(() => http.GetAsync($"integrations/{integrationId}/push-options" + (scope is null ? "" : "?scope=" + Uri.EscapeDataString(scope)), ct), ct) ?? throw new ApiException("That connection no longer exists.");
 
     public async Task<PushResponse> PushNotesAsync(Guid integrationId, PushRequest r, CancellationToken ct = default) =>
         await Send<PushResponse>(() => http.PostAsJsonAsync($"integrations/{integrationId}/push", r, ct), ct) ?? throw new ApiException("That connection or document no longer exists.");

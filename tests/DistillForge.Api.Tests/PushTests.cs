@@ -34,39 +34,81 @@ public class AzureDevOpsTargetTests
     private static HttpResponseMessage Json(HttpStatusCode code, string json) =>
         new(code) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
-    private static TargetConnection Conn(string org = "https://dev.azure.com/acme", string? area = null) => new(
-        new Dictionary<string, string> { ["organizationUrl"] = org, ["project"] = "My Project", ["areaPath"] = area ?? "" },
+    private static TargetConnection Conn(string org = "https://dev.azure.com/acme", string project = "") => new(
+        new Dictionary<string, string> { ["organizationUrl"] = org, ["project"] = project },
         new Dictionary<string, string> { ["pat"] = "secret-pat" });
 
     private static readonly ExportItem Item = new(Guid.NewGuid(), "  Send   the <b>budget</b> ", "Needs sign-off", "Sam", "Fri", "we must send it", "S2", "Finance; Q4", "Board <call>");
 
-    [Fact]
-    public async Task Options_lists_enabled_types_and_defaults_to_Task()
-    {
-        var h = new FakeHandler((_, _) => Json(HttpStatusCode.OK, """{"value":[{"name":"Bug"},{"name":"Task"},{"name":"Old","isDisabled":true}]}"""));
-        var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(), default);
+    private static PushChoices Choices(string type = "Task", string? scope = "My Project", string? area = null) => new(type, scope, area);
 
+    [Fact]
+    public async Task Options_lists_projects_then_the_types_of_the_chosen_one()
+    {
+        var h = new FakeHandler((r, _) => r.RequestUri!.AbsolutePath.EndsWith("/_apis/projects")
+            ? Json(HttpStatusCode.OK, """{"value":[{"name":"Zeta"},{"name":"Alpha"}]}""")
+            : Json(HttpStatusCode.OK, """{"value":[{"name":"Bug"},{"name":"Task"},{"name":"Old","isDisabled":true}]}"""));
+        var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(), null, default);
+
+        Assert.Equal(["Alpha", "Zeta"], o.Scopes);
+        Assert.Equal("Alpha", o.Scope);
         Assert.Equal(["Bug", "Task"], o.ItemTypes);
         Assert.Equal("Task", o.DefaultItemType);
-        var call = h.Calls.Single().Request;
-        Assert.Equal("https://dev.azure.com/acme/My%20Project/_apis/wit/workitemtypes?api-version=7.1", call.RequestUri!.AbsoluteUri);
-        Assert.Equal("Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(":secret-pat")), call.Headers.Authorization!.ToString());
+        Assert.Equal("Project", o.ScopeLabel);
+        Assert.Equal("https://dev.azure.com/acme/_apis/projects?api-version=7.1&$top=500", h.Calls[0].Request.RequestUri!.AbsoluteUri);
+        Assert.Equal("https://dev.azure.com/acme/Alpha/_apis/wit/workitemtypes?api-version=7.1", h.Calls[1].Request.RequestUri!.AbsoluteUri);
+        Assert.Equal("Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(":secret-pat")), h.Calls[0].Request.Headers.Authorization!.ToString());
+    }
+
+    [Fact]
+    public async Task The_saved_default_project_is_preselected_when_it_exists()
+    {
+        var h = new FakeHandler((r, _) => r.RequestUri!.AbsolutePath.EndsWith("/_apis/projects")
+            ? Json(HttpStatusCode.OK, """{"value":[{"name":"Alpha"},{"name":"My Project"}]}""")
+            : Json(HttpStatusCode.OK, """{"value":[{"name":"Task"}]}"""));
+        var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(project: "My Project"), null, default);
+        Assert.Equal("My Project", o.Scope);
+        Assert.Contains("/My%20Project/_apis/wit/workitemtypes", h.Calls[1].Request.RequestUri!.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task Asking_for_a_scope_only_fetches_its_types()
+    {
+        var h = new FakeHandler((_, _) => Json(HttpStatusCode.OK, """{"value":[{"name":"Epic"}]}"""));
+        var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(), "Other", default);
+        Assert.Null(o.Scopes);
+        Assert.Equal("Other", o.Scope);
+        Assert.Single(h.Calls);
+    }
+
+    [Fact]
+    public async Task A_token_that_cannot_list_projects_falls_back_to_the_saved_default()
+    {
+        var h = new FakeHandler((r, _) => r.RequestUri!.AbsolutePath.EndsWith("/_apis/projects")
+            ? new HttpResponseMessage(HttpStatusCode.Forbidden)
+            : Json(HttpStatusCode.OK, """{"value":[{"name":"Task"}]}"""));
+        var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(project: "Mine"), null, default);
+        Assert.Null(o.Error);
+        Assert.Equal(["Mine"], o.Scopes);
+
+        var noDefault = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(), null, default);
+        Assert.Contains("Project and Team", noDefault.Error);
     }
 
     [Fact]
     public async Task Options_reports_a_rejected_token_as_an_error_not_an_exception()
     {
         var h = new FakeHandler((_, _) => new HttpResponseMessage(HttpStatusCode.NonAuthoritativeInformation) { Content = new StringContent("<html>sign in</html>") });
-        var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(), default);
+        var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(), null, default);
         Assert.Empty(o.ItemTypes);
         Assert.Contains("rejected the token", o.Error);
     }
 
     [Fact]
-    public async Task Push_posts_a_json_patch_to_the_chosen_type_and_returns_the_link()
+    public async Task Push_posts_a_json_patch_to_the_chosen_project_and_type_and_returns_the_link()
     {
         var h = new FakeHandler((_, _) => Json(HttpStatusCode.OK, """{"id":42,"_links":{"html":{"href":"https://dev.azure.com/acme/_workitems/edit/42"}}}"""));
-        var outcome = await new AzureDevOpsTarget(new Factory(h)).PushAsync(Conn(area: "My Project\\Team"), Item, "Bug", default);
+        var outcome = await new AzureDevOpsTarget(new Factory(h)).PushAsync(Conn(), Item, Choices("Bug", "My Project", "My Project\\Team"), default);
 
         Assert.True(outcome.Ok);
         Assert.Equal("42", outcome.ExternalId);
@@ -79,6 +121,25 @@ public class AzureDevOpsTargetTests
         Assert.Equal("Send the <b>budget</b>", ops["/fields/System.Title"]);
         Assert.Equal("My Project\\Team", ops["/fields/System.AreaPath"]);
         Assert.Equal("Finance  Q4", ops["/fields/System.Tags"]);   // ';' would split it into two tags
+    }
+
+    [Fact]
+    public async Task A_project_name_cannot_escape_its_path_segment()
+    {
+        var h = new FakeHandler((_, _) => Json(HttpStatusCode.OK, """{"id":1}"""));
+        await new AzureDevOpsTarget(new Factory(h)).PushAsync(Conn(), Item, Choices(scope: "../../x?y=1#z"), default);
+        var uri = h.Calls.Single().Request.RequestUri!;
+        Assert.Equal("dev.azure.com", uri.Host);
+        Assert.StartsWith("/acme/..%2F..%2Fx%3Fy%3D1%23z/_apis/wit/workitems/", uri.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task Push_without_a_project_fails_the_note_without_calling_out()
+    {
+        var h = new FakeHandler((_, _) => Json(HttpStatusCode.OK, "{}"));
+        var o = await new AzureDevOpsTarget(new Factory(h)).PushAsync(Conn(), Item, Choices(scope: " "), default);
+        Assert.False(o.Ok);
+        Assert.Empty(h.Calls);
     }
 
     [Fact]
@@ -98,14 +159,14 @@ public class AzureDevOpsTargetTests
     public async Task Auth_failure_on_push_throws_so_the_caller_can_stop()
     {
         var h = new FakeHandler((_, _) => new HttpResponseMessage(HttpStatusCode.Unauthorized));
-        await Assert.ThrowsAsync<ExportAuthException>(() => new AzureDevOpsTarget(new Factory(h)).PushAsync(Conn(), Item, "Task", default));
+        await Assert.ThrowsAsync<ExportAuthException>(() => new AzureDevOpsTarget(new Factory(h)).PushAsync(Conn(), Item, Choices(), default));
     }
 
     [Fact]
     public async Task Note_specific_refusal_is_a_failed_outcome_with_the_servers_message()
     {
         var h = new FakeHandler((_, _) => Json(HttpStatusCode.BadRequest, """{"message":"TF401320: Rule Error for field Title."}"""));
-        var o = await new AzureDevOpsTarget(new Factory(h)).PushAsync(Conn(), Item, "Task", default);
+        var o = await new AzureDevOpsTarget(new Factory(h)).PushAsync(Conn(), Item, Choices(), default);
         Assert.False(o.Ok);
         Assert.Contains("TF401320", o.Error);
     }
@@ -117,10 +178,10 @@ public class AzureDevOpsTargetTests
     public async Task Never_calls_a_host_that_isnt_azure_devops(string org)
     {
         var h = new FakeHandler((_, _) => Json(HttpStatusCode.OK, "{}"));
-        var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(org), default);
+        var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(org), null, default);
         Assert.NotNull(o.Error);
         Assert.Empty(h.Calls);
-        await Assert.ThrowsAsync<ExportAuthException>(() => new AzureDevOpsTarget(new Factory(h)).PushAsync(Conn(org), Item, "Task", default));
+        await Assert.ThrowsAsync<ExportAuthException>(() => new AzureDevOpsTarget(new Factory(h)).PushAsync(Conn(org), Item, Choices(), default));
         Assert.Empty(h.Calls);
     }
 }
@@ -138,9 +199,12 @@ public class PushFunctionsTests : IDisposable
         public List<ExportItem> Pushed { get; } = [];
         public HashSet<string> FailTitles { get; } = [];
         public bool AuthFails { get; set; }
-        public Task<PushOptionsDto> GetOptionsAsync(TargetConnection c, CancellationToken ct) => Task.FromResult(new PushOptionsDto(["Task"], "Task", null));
-        public Task<PushOutcome> PushAsync(TargetConnection c, ExportItem item, string itemType, CancellationToken ct)
+        public string? ScopeLabel => "Project";
+        public List<PushChoices> Choices { get; } = [];
+        public Task<PushOptionsDto> GetOptionsAsync(TargetConnection c, string? scope, CancellationToken ct) => Task.FromResult(new PushOptionsDto(["Task"], "Task", null));
+        public Task<PushOutcome> PushAsync(TargetConnection c, ExportItem item, PushChoices choices, CancellationToken ct)
         {
+            Choices.Add(choices);
             if (AuthFails) throw new ExportAuthException("bad token");
             if (FailTitles.Contains(item.Title)) return Task.FromResult(new PushOutcome(item.NoteId, false, null, null, "nope"));
             Pushed.Add(item);
@@ -159,7 +223,8 @@ public class PushFunctionsTests : IDisposable
 
     private PushFunctions Fns(DistillForge.Data.DistillForgeDbContext db, FakeTarget t) => new(db, Secrets(), [t]);
 
-    private static PushRequest Req(Guid ws, IEnumerable<Guid> notes, bool repush = false, bool source = true) => new(ws, notes.ToList(), "Task", source, repush);
+    private static PushRequest Req(Guid ws, IEnumerable<Guid> notes, bool repush = false, bool source = true, string? scope = "Proj", string? area = null) =>
+        new(ws, notes.ToList(), "Task", source, repush, scope, area);
 
     private static List<PushOutcome> Outcomes(IActionResult r) => Assert.IsType<PushResponse>(Assert.IsType<OkObjectResult>(r).Value).Outcomes.ToList();
 
@@ -215,6 +280,34 @@ public class PushFunctionsTests : IDisposable
 
         Assert.True(Outcomes(await fns.Push(Http.Json(Req(ws.Id, [n.Id], repush: true)), integration, Ct)).Single().Ok);
         Assert.Equal(2, target.Pushed.Count);
+    }
+
+    [Fact]
+    public async Task Choices_reach_the_target_and_a_different_project_is_not_a_duplicate()
+    {
+        var ws = _db.SeedWorkspace();
+        var n = _db.SeedNote(ws.Id);
+        var integration = SeedIntegration();
+        var target = new FakeTarget();
+        await using var db = _db.NewContext();
+        var fns = Fns(db, target);
+
+        await fns.Push(Http.Json(Req(ws.Id, [n.Id], area: " Proj\\Team ")), integration, Ct);
+        Assert.Equal(new PushChoices("Task", "Proj", "Proj\\Team"), target.Choices.Single());
+
+        Assert.False(Outcomes(await fns.Push(Http.Json(Req(ws.Id, [n.Id])), integration, Ct)).Single().Ok);          // same project: skipped
+        Assert.True(Outcomes(await fns.Push(Http.Json(Req(ws.Id, [n.Id], scope: "Other")), integration, Ct)).Single().Ok);
+        Assert.Equal(["Proj", "Other"], (await db.NotePushes.ToListAsync()).OrderBy(p => p.PushedAt).Select(p => p.Scope));
+    }
+
+    [Fact]
+    public async Task A_project_is_required_by_platforms_that_have_one()
+    {
+        var ws = _db.SeedWorkspace();
+        var n = _db.SeedNote(ws.Id);
+        await using var db = _db.NewContext();
+        var result = await Fns(db, new FakeTarget()).Push(Http.Json(Req(ws.Id, [n.Id], scope: " ")), SeedIntegration(), Ct);
+        Assert.Contains("project", Assert.IsType<BadRequestObjectResult>(result).Value!.ToString());
     }
 
     [Fact]
@@ -284,7 +377,7 @@ public class PushFunctionsTests : IDisposable
 
         Assert.IsType<BadRequestObjectResult>(await fns.Push(Http.Json(Req(ws.Id, [])), integration, Ct));
         Assert.IsType<BadRequestObjectResult>(await fns.Push(Http.Json(Req(ws.Id, Enumerable.Range(0, PushSupport.MaxNotes + 1).Select(_ => Guid.NewGuid()))), integration, Ct));
-        Assert.IsType<BadRequestObjectResult>(await fns.Push(Http.Json(new PushRequest(ws.Id, [Guid.NewGuid()], " ")), integration, Ct));
+        Assert.IsType<BadRequestObjectResult>(await fns.Push(Http.Json(new PushRequest(ws.Id, [Guid.NewGuid()], " ", Scope: "Proj")), integration, Ct));
 
         var github = SeedIntegration(platform: IntegrationPlatform.GitHub);
         Assert.IsType<BadRequestObjectResult>(await fns.Push(Http.Json(Req(ws.Id, [Guid.NewGuid()])), github, Ct));

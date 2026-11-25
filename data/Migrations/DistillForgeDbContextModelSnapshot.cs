@@ -465,6 +465,10 @@ namespace DistillForge.Data.Migrations
                     b.Property<DateTimeOffset>("PushedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Scope")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IntegrationId");
