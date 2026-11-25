@@ -17,7 +17,7 @@
         else if (_connections.Count == 0)
         {
             <p class="empty-hint">
-                No connection to push to yet. Add an Azure DevOps connection with the 🔌 button in the banner, then come back.
+                No connection to push to yet. Add an Azure DevOps or Trello connection with the 🔌 button in the banner, then come back.
             </p>
             <div class="dialog-actions"><button type="button" class="primary" @onclick="Close">Close</button></div>
         }
@@ -64,11 +64,11 @@
             {
                 <label for="push-scope">@scopeLabel</label>
                 <select id="push-scope" value="@_scope" @onchange="OnScopeChanged" disabled="@(_busy || _optionsLoading || _options.Scopes is not { Count: > 0 })">
-                    @foreach (var sc in _scopes) { <option value="@sc">@sc</option> }
+                    @foreach (var sc in _scopes) { <option value="@sc.Value">@sc.Label</option> }
                 </select>
             }
 
-            <label for="push-type">Create each note as</label>
+            <label for="push-type">@(_options?.ItemTypeLabel ?? "Create each note as")</label>
             @if (_optionsLoading)
             {
                 <select id="push-type" disabled><option>Loading types…</option></select>
@@ -76,7 +76,7 @@
             else
             {
                 <select id="push-type" @bind="_itemType" disabled="@(_busy || _options is not { Error: null })">
-                    @foreach (var t in _options?.ItemTypes ?? []) { <option value="@t">@t</option> }
+                    @foreach (var t in _options?.ItemTypes ?? []) { <option value="@t.Value">@t.Label</option> }
                 </select>
             }
             @if (_options?.Error is not null)
@@ -84,7 +84,7 @@
                 <p class="warning error" role="alert">@_options.Error</p>
             }
 
-            @if (_options?.ScopeLabel is not null)
+            @if (_options is { HasAreaPath: true })
             {
                 <label for="push-area">Area path <span class="muted small">(optional)</span></label>
                 <input id="push-area" type="text" maxlength="500" @bind="_areaPath" @bind:event="oninput" disabled="@_busy" placeholder="@(_scope + "\\Team")" autocomplete="off" />
@@ -118,7 +118,7 @@
                 <label class="check"><input type="checkbox" @bind="_repush" disabled="@_busy" /> Push again even if already pushed (creates duplicates)</label>
             }
             <p class="muted small">
-                Owner and due date go into the description. The category name is added as a tag.
+                Owner and due date go into the description. The category name is added as a tag in Azure DevOps and in the description in Trello.
             </p>
 
             <div class="dialog-actions">
@@ -145,7 +145,7 @@
     private readonly HashSet<Guid> _chosen = [];
     private Guid _connectionId;
     private PushOptionsDto? _options;
-    private List<string> _scopes = [];
+    private List<PushOption> _scopes = [];
     private string _scope = "", _areaPath = "";
     private string _itemType = "";
     private bool _loading = true, _optionsLoading, _busy, _includeSource = true, _repush;
@@ -194,7 +194,7 @@
             var options = await Api.GetPushOptionsAsync(_connectionId, scope, _cts.Token);
             // Keep the project list we already have; the answer only carries the new project's types.
             _options = options with { Scopes = _scopes };
-            _itemType = options.ItemTypes.Contains(previous) ? previous : options.DefaultItemType ?? "";
+            _itemType = options.ItemTypes.Any(t => t.Value == previous) ? previous : options.DefaultItemType ?? "";
         }
         catch (ApiException ex) { _error = ex.Message; }
         _optionsLoading = false;

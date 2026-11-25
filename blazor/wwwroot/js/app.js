@@ -23,6 +23,52 @@ window.distillforge.copyText = async function (text) {
   return ok;
 };
 
+// Opens Trello's approval page in a pop-up and reports what trello-callback.html sends back, by window.opener message or by
+// BroadcastChannel (same origin only). Calls OnTrelloResult(code, state, error, reason): a code and state on success; an error
+// when Trello refused; or a reason of 'blocked' (pop-up blocker), 'invalid' or 'timeout'. The caller checks `state`.
+// There is deliberately no "pop-up was closed" detection: sign-in sites can sever the pop-up from this window, which makes
+// `popup.closed` look true while the user is still approving. The UI offers Cancel instead (cancelTrello).
+window.distillforge.connectTrello = function (authUrl, dotnetRef) {
+  if (window.distillforge._trelloCancel) window.distillforge._trelloCancel();
+  const w = 520, h = 720;
+  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - w) / 2));
+  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - h) / 2));
+  const popup = window.open(authUrl, 'distillforge-trello', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top);
+  if (!popup) { dotnetRef.invokeMethodAsync('OnTrelloResult', null, null, null, 'blocked'); return; }
+
+  let done = false;
+  const channel = 'BroadcastChannel' in window ? new BroadcastChannel('distillforge-trello') : null;
+  const cleanup = function () {
+    done = true;
+    window.removeEventListener('message', onMessage);
+    if (channel) channel.close();
+    clearTimeout(timeout);
+    window.distillforge._trelloCancel = null;
+  };
+  const finish = function (code, state, error, reason) {
+    if (done) return;
+    cleanup();
+    try { popup.close(); } catch (err) { /* already gone */ }
+    dotnetRef.invokeMethodAsync('OnTrelloResult', code, state, error, reason);
+  };
+  const handle = function (d) {
+    if (done || !d || d.type !== 'distillforge-trello') return;
+    if (typeof d.error === 'string' && d.error) { finish(null, null, String(d.errorDescription || d.error).slice(0, 200), null); return; }
+    if (typeof d.code === 'string' && /^[A-Za-z0-9._~-]{8,2048}$/.test(d.code) && typeof d.state === 'string' && /^[A-Za-z0-9_-]{8,200}$/.test(d.state))
+      finish(d.code, d.state, null, null);
+    else finish(null, null, null, 'invalid');
+  };
+  const onMessage = function (e) { if (e.origin === window.location.origin && e.source === popup) handle(e.data); };
+  window.addEventListener('message', onMessage);
+  if (channel) channel.onmessage = function (e) { handle(e.data); };
+  const timeout = setTimeout(function () { finish(null, null, null, 'timeout'); }, 10 * 60 * 1000);
+  window.distillforge._trelloCancel = function () { if (done) return; cleanup(); try { popup.close(); } catch (err) { /* gone */ } };
+};
+
+window.distillforge.cancelTrello = function () {
+  if (window.distillforge._trelloCancel) window.distillforge._trelloCancel();
+};
+
 // Firefox won't start a drag unless dataTransfer has data; Blazor can't set it, so do it here.
 document.addEventListener('dragstart', function (e) {
   if (e.target && e.target.classList && e.target.classList.contains('note-wrap') && e.dataTransfer) {

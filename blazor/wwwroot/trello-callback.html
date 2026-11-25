@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Connecting Trello…</title>
+    <style>body { font-family: system-ui, sans-serif; margin: 2rem; color: #333; }</style>
+</head>
+<body>
+    <p id="msg">Finishing the connection to Trello…</p>
+    <script>
+        // Trello (via Atlassian) redirects here with ?code=…&state=… (or ?error=…). Pass the result to the DistillForge window that
+        // started the sign-in, then scrub the address bar so the code doesn't linger in history. Two routes, same origin only:
+        // window.opener, and a BroadcastChannel for browsers where the sign-in site's headers cut the pop-up off from its opener.
+        (function () {
+            var q = new URLSearchParams(window.location.search);
+            var code = q.get('code'), state = q.get('state'), error = q.get('error');
+            history.replaceState(null, '', window.location.pathname);
+            var msg = document.getElementById('msg');
+            if (!code && !error) { msg.textContent = 'Trello didn\u2019t send anything back. Close this window and try again.'; return; }
+
+            var payload = { type: 'distillforge-trello', code: code, state: state, error: error, errorDescription: q.get('error_description') };
+            try { if (window.opener) window.opener.postMessage(payload, window.location.origin); } catch (e) { /* no opener */ }
+            try { var ch = new BroadcastChannel('distillforge-trello'); ch.postMessage(payload); ch.close(); } catch (e) { /* unsupported */ }
+
+            msg.textContent = error ? 'Trello didn\u2019t approve the connection. You can close this window.' : 'Approved. You can close this window.';
+            setTimeout(function () { window.close(); }, 300);
+        })();
+    </script>
+</body>
+</html>

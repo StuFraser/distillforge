@@ -10,16 +10,21 @@ public sealed record ExportItem(
 /// <summary>What happened to one note in a push. Ok=false carries a message the user can act on.</summary>
 public sealed record PushOutcome(Guid NoteId, bool Ok, string? ExternalId, string? Url, string? Error);
 
+/// <summary>A choice shown by name but sent by value (Trello boards and lists are chosen by name, addressed by id).</summary>
+public sealed record PushOption(string Value, string Label);
+
 /// <summary>
-/// What the push dialog offers for a connection, fetched live. Platforms with a level above the item (Azure DevOps projects)
+/// What the push dialog offers for a connection, fetched live. <see cref="ItemTypes"/> is what each note becomes (a work item type,
+/// a Trello list), worded by <see cref="ItemTypeLabel"/>. Platforms with a level above the item (Azure DevOps projects, Trello boards)
 /// set <see cref="ScopeLabel"/>; <see cref="Scopes"/> is only filled when no scope was asked for, and <see cref="Scope"/> is the one
 /// the item types belong to.
 /// </summary>
 public sealed record PushOptionsDto(
-    IReadOnlyList<string> ItemTypes, string? DefaultItemType, string? Error,
-    string? ScopeLabel = null, IReadOnlyList<string>? Scopes = null, string? Scope = null);
+    IReadOnlyList<PushOption> ItemTypes, string? DefaultItemType, string? Error,
+    string? ScopeLabel = null, IReadOnlyList<PushOption>? Scopes = null, string? Scope = null,
+    string ItemTypeLabel = "Create each note as", bool HasAreaPath = false);
 
-/// <summary>What the user chose at push time. Scope is the project; AreaPath is optional and only meaningful within it.</summary>
+/// <summary>What the user chose at push time: the option values from <see cref="PushOptionsDto"/>. AreaPath is optional and only for platforms that have one.</summary>
 public sealed record PushChoices(string ItemType, string? Scope, string? AreaPath);
 
 /// <summary>
@@ -39,5 +44,5 @@ public static class PushSupport
     public const int MaxNotes = 50;
 
     /// <summary>Platforms that have a push implementation. The rest can be connected but not pushed to yet.</summary>
-    public static bool IsSupported(IntegrationPlatform p) => p == IntegrationPlatform.AzureDevOps;
+    public static bool IsSupported(IntegrationPlatform p) => p is IntegrationPlatform.AzureDevOps or IntegrationPlatform.Trello;
 }

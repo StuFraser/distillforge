@@ -29,6 +29,8 @@ public sealed class IntegrationFunctions(DistillForgeDbContext db, SecretProtect
     {
         var body = await WorkspaceFunctions.ReadBody<IntegrationRequest>(req, ct);
         if (body is null) return new BadRequestObjectResult("Expected JSON body with platform, name and values.");
+        if (Enum.IsDefined(body.Platform) && IntegrationCatalog.Get(body.Platform).UsesOAuth)
+            return new BadRequestObjectResult($"{IntegrationCatalog.Get(body.Platform).Name} is added with “Connect with {IntegrationCatalog.Get(body.Platform).Name}”.");
         if (IntegrationValidation.Validate(body) is { } error) return new BadRequestObjectResult(error);
         if (await NameTaken(body.Name, null, ct)) return new ConflictObjectResult($"A connection named '{body.Name.Trim()}' already exists.");
 

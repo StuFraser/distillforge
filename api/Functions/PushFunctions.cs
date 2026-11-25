@@ -108,7 +108,7 @@ public sealed class PushFunctions(DistillForgeDbContext db, SecretProtector secr
 
     private async Task<Resolved> Resolve(Guid id, CancellationToken ct)
     {
-        var i = await db.Integrations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        var i = await db.Integrations.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (i is null) return new(null, null, new NotFoundResult());
         var target = targets.FirstOrDefault(t => t.Platform == i.Platform);
         if (target is null) return new(null, null, new BadRequestObjectResult($"Pushing to {i.Platform} isn't supported yet."));
@@ -118,8 +118,19 @@ public sealed class PushFunctions(DistillForgeDbContext db, SecretProtector secr
             var secretValues = string.IsNullOrEmpty(i.SecretsEncrypted)
                 ? []
                 : JsonSerializer.Deserialize<Dictionary<string, string>>(secrets.Unprotect(i.SecretsEncrypted)) ?? [];
-            return new(target, new TargetConnection(settings, secretValues), null);
+            var connection = new TargetConnection(settings, secretValues);
+
+            // Expiring credentials (OAuth) are renewed here and the new ones saved, so every caller gets a usable connection.
+            if (await target.RefreshSecretsAsync(connection, ct) is { } renewed)
+            {
+                i.SecretsEncrypted = secrets.Protect(JsonSerializer.Serialize(renewed));
+                i.SecretKeys = renewed.Keys.Order().ToList();
+                await db.SaveChangesAsync(ct);
+                connection = new TargetConnection(settings, renewed);
+            }
+            return new(target, connection, null);
         }
         catch (SecretProtectionException ex) { return new(null, null, new ObjectResult(ex.Message) { StatusCode = 500 }); }
+        catch (ExportAuthException ex) { return new(null, null, new BadRequestObjectResult(ex.Message)); }
     }
 }

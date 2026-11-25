@@ -13,24 +13,24 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DistillForge.Api.Tests;
 
+internal sealed class FakeHandler(Func<HttpRequestMessage, string?, HttpResponseMessage> respond) : HttpMessageHandler
+{
+    public List<(HttpRequestMessage Request, string? Body)> Calls { get; } = [];
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(ct);
+        Calls.Add((request, body));
+        return respond(request, body);
+    }
+}
+
+internal sealed class Factory(HttpMessageHandler h) : IHttpClientFactory
+{
+    public HttpClient CreateClient(string name) => new(h, disposeHandler: false);
+}
+
 public class AzureDevOpsTargetTests
 {
-    private sealed class FakeHandler(Func<HttpRequestMessage, string?, HttpResponseMessage> respond) : HttpMessageHandler
-    {
-        public List<(HttpRequestMessage Request, string? Body)> Calls { get; } = [];
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-        {
-            var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(ct);
-            Calls.Add((request, body));
-            return respond(request, body);
-        }
-    }
-
-    private sealed class Factory(HttpMessageHandler h) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => new(h, disposeHandler: false);
-    }
-
     private static HttpResponseMessage Json(HttpStatusCode code, string json) =>
         new(code) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
@@ -50,11 +50,12 @@ public class AzureDevOpsTargetTests
             : Json(HttpStatusCode.OK, """{"value":[{"name":"Bug"},{"name":"Task"},{"name":"Old","isDisabled":true}]}"""));
         var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(), null, default);
 
-        Assert.Equal(["Alpha", "Zeta"], o.Scopes);
+        Assert.Equal(["Alpha", "Zeta"], o.Scopes!.Select(x => x.Value));
         Assert.Equal("Alpha", o.Scope);
-        Assert.Equal(["Bug", "Task"], o.ItemTypes);
+        Assert.Equal(["Bug", "Task"], o.ItemTypes.Select(x => x.Value));
         Assert.Equal("Task", o.DefaultItemType);
         Assert.Equal("Project", o.ScopeLabel);
+        Assert.True(o.HasAreaPath);
         Assert.Equal("https://dev.azure.com/acme/_apis/projects?api-version=7.1&$top=500", h.Calls[0].Request.RequestUri!.AbsoluteUri);
         Assert.Equal("https://dev.azure.com/acme/Alpha/_apis/wit/workitemtypes?api-version=7.1", h.Calls[1].Request.RequestUri!.AbsoluteUri);
         Assert.Equal("Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(":secret-pat")), h.Calls[0].Request.Headers.Authorization!.ToString());
@@ -89,7 +90,7 @@ public class AzureDevOpsTargetTests
             : Json(HttpStatusCode.OK, """{"value":[{"name":"Task"}]}"""));
         var o = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(project: "Mine"), null, default);
         Assert.Null(o.Error);
-        Assert.Equal(["Mine"], o.Scopes);
+        Assert.Equal(["Mine"], o.Scopes!.Select(x => x.Value));
 
         var noDefault = await new AzureDevOpsTarget(new Factory(h)).GetOptionsAsync(Conn(), null, default);
         Assert.Contains("Project and Team", noDefault.Error);
@@ -199,9 +200,14 @@ public class PushFunctionsTests : IDisposable
         public List<ExportItem> Pushed { get; } = [];
         public HashSet<string> FailTitles { get; } = [];
         public bool AuthFails { get; set; }
+        public Dictionary<string, string>? Renewed { get; set; }
+        public bool RefreshFails { get; set; }
+        public Task<IReadOnlyDictionary<string, string>?> RefreshSecretsAsync(TargetConnection c, CancellationToken ct) =>
+            RefreshFails ? throw new ExportAuthException("Reconnect please")
+            : Task.FromResult<IReadOnlyDictionary<string, string>?>(Renewed);
         public string? ScopeLabel => "Project";
         public List<PushChoices> Choices { get; } = [];
-        public Task<PushOptionsDto> GetOptionsAsync(TargetConnection c, string? scope, CancellationToken ct) => Task.FromResult(new PushOptionsDto(["Task"], "Task", null));
+        public Task<PushOptionsDto> GetOptionsAsync(TargetConnection c, string? scope, CancellationToken ct) => Task.FromResult(new PushOptionsDto([new("Task", "Task")], "Task", null));
         public Task<PushOutcome> PushAsync(TargetConnection c, ExportItem item, PushChoices choices, CancellationToken ct)
         {
             Choices.Add(choices);
@@ -364,6 +370,39 @@ public class PushFunctionsTests : IDisposable
         // B's own connection, A's workspace: still 404, nothing pushed.
         var bIntegration = SeedIntegration(TestDb.UserB);
         Assert.IsType<NotFoundResult>(await Fns(asB, target).Push(Http.Json(Req(ws.Id, [n.Id])), bIntegration, Ct));
+        Assert.Empty(target.Pushed);
+    }
+
+    [Fact]
+    public async Task Renewed_credentials_are_saved_encrypted_before_the_push()
+    {
+        var ws = _db.SeedWorkspace();
+        var n = _db.SeedNote(ws.Id);
+        var integration = SeedIntegration();
+        var target = new FakeTarget { Renewed = new() { ["accessToken"] = "NEW", ["refreshToken"] = "R2" } };
+
+        await using var db = _db.NewContext();
+        Assert.True(Outcomes(await Fns(db, target).Push(Http.Json(Req(ws.Id, [n.Id])), integration, Ct)).Single().Ok);
+
+        var row = await db.Integrations.AsNoTracking().SingleAsync();
+        Assert.Equal(["accessToken", "refreshToken"], row.SecretKeys);
+        Assert.DoesNotContain("NEW", row.SecretsEncrypted!);
+        var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(Secrets().Unprotect(row.SecretsEncrypted!))!;
+        Assert.Equal("R2", stored["refreshToken"]);
+    }
+
+    [Fact]
+    public async Task A_connection_that_cannot_be_renewed_says_so_instead_of_pushing()
+    {
+        var ws = _db.SeedWorkspace();
+        var n = _db.SeedNote(ws.Id);
+        var integration = SeedIntegration();
+        var target = new FakeTarget { RefreshFails = true };
+
+        await using var db = _db.NewContext();
+        var push = await Fns(db, target).Push(Http.Json(Req(ws.Id, [n.Id])), integration, Ct);
+        Assert.Equal("Reconnect please", Assert.IsType<BadRequestObjectResult>(push).Value);
+        Assert.IsType<BadRequestObjectResult>(await Fns(db, target).Options(Http.Empty(), integration, Ct));
         Assert.Empty(target.Pushed);
     }
 

@@ -1,5 +1,7 @@
 @inject DistillForgeApi Api
 @inject DialogService Dialogs
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
 @implements IDisposable
 
 <div class="dialog-backdrop" @onclick="Close">
@@ -65,7 +67,7 @@
         else
         {
             <h3>@(_editing is null ? "Add" : "Edit") @_def!.Name <span class="muted small">connection</span></h3>
-            @if (_def.HelpUrl is not null)
+            @if (_def.HelpUrl is not null && !_def.UsesOAuth)
             {
                 <p class="muted small">Need a token? <a href="@_def.HelpUrl" target="_blank" rel="noopener noreferrer">Open @_def.Name's token page</a>.</p>
             }
@@ -74,11 +76,8 @@
             <input id="int-name" type="text" maxlength="@IntegrationValidation.MaxName" @bind="_name" @bind:event="oninput" disabled="@_busy"
                    placeholder="@($"e.g. {_def.Name} – my project")" />
 
-            @foreach (var f in _def.Fields)
-            {
-                var id = $"int-f-{f.Key}";
-                <div>
-                    <label for="@id">@f.Label @if (!f.Required) { <span class="muted small">(optional)</span> }</label>
+            RenderFragment<FieldDef> fieldUi = f => @<div>
+                    <label for="@FieldId(f)">@f.Label @if (!f.Required) { <span class="muted small">(optional)</span> }</label>
                     @if (f.IsSecret && HasStoredSecret(f) && !_replace.Contains(f.Key))
                     {
                         <div class="dialog-row">
@@ -89,20 +88,50 @@
                     }
                     else
                     {
-                        <input id="@id" type="@(f.IsSecret ? "password" : "text")" autocomplete="off" disabled="@_busy"
+                        <input id="@FieldId(f)" type="@(f.IsSecret ? "password" : "text")" autocomplete="off" disabled="@_busy"
                                maxlength="@(f.IsSecret ? IntegrationValidation.MaxSecret : IntegrationValidation.MaxValue)"
                                value="@Value(f)" @oninput="e => SetValue(f, e.Value)"
                                placeholder="@(f.Placeholder ?? f.Default)" />
                     }
                     @if (f.Help is not null) { <span class="muted small">@f.Help</span> }
+                </div>;
+
+            @if (_def.UsesOAuth)
+            {
+                <div class="connect-box">
+                    <button type="button" class="@(_editing is null ? "primary" : "secondary")" @onclick="ConnectTrello"
+                            disabled="@(_busy || _connecting || string.IsNullOrWhiteSpace(_name) || !_trello.Configured)">
+                        @(_connecting ? "Waiting for Trello…" : _busy ? "Connecting…" : _editing is null ? "Connect with Trello" : "Reconnect")
+                    </button>
+                    @if (_connecting) { <button type="button" class="link" @onclick="CancelConnect">Cancel</button> }
+                    @if (_editing is not null && !_connecting) { <span class="ok-text">Connected.</span> }
+                    @if (!_trello.Configured)
+                    {
+                        <p class="warning error">
+                            DistillForge isn't set up for Trello yet. Whoever runs it needs to set <code>Trello__ClientId</code> (the OAuth client id of the Trello Power-Up).
+                        </p>
+                    }
+                    else if (string.IsNullOrWhiteSpace(_name))
+                    {
+                        <p class="muted small">Give the connection a name first.</p>
+                    }
+                    <p class="muted small">
+                        Opens Trello in a pop-up where you approve access for your account. DistillForge never sees your Trello password,
+                        and you can revoke access from your Trello settings at any time.
+                    </p>
                 </div>
             }
 
+            @foreach (var f in _def.Fields) { @fieldUi(f) }
+
             <div class="dialog-actions">
                 <button type="button" class="secondary" @onclick="BackToList" disabled="@_busy">Cancel</button>
-                <button type="button" class="primary" @onclick="Save" disabled="@(_busy || IntegrationValidation.Validate(BuildRequest(), _editing?.SecretsSet) is not null)">
-                    @(_busy ? "Saving…" : "Save")
-                </button>
+                @if (!_def.UsesOAuth || _editing is not null)
+                {
+                    <button type="button" class="primary" @onclick="Save" disabled="@(_busy || IntegrationValidation.Validate(BuildRequest(), _editing?.SecretsSet) is not null)">
+                        @(_busy ? "Saving…" : "Save")
+                    </button>
+                }
             </div>
         }
     </div>
@@ -126,8 +155,16 @@
     private readonly HashSet<string> _replace = [];     // stored secrets the user chose to overwrite
     private readonly HashSet<string> _clear = [];       // stored optional secrets the user chose to remove
 
+    // Trello "Connect": the PKCE verifier and state live only here, for the one sign-in in progress.
+    private TrelloConnectInfoDto _trello = new(false, null);
+    private DotNetObjectReference<IntegrationsDialog>? _self;
+    private bool _connecting;
+    private string _verifier = "", _state = "", _redirect = "";
+
     protected override async Task OnInitializedAsync()
     {
+        _self = DotNetObjectReference.Create(this);
+        try { _trello = await Api.GetTrelloConnectInfoAsync(_cts.Token); } catch (ApiException) { /* Connect stays disabled with an explanation */ }
         await Reload();
         _loading = false;
     }
@@ -153,12 +190,15 @@
         _editing = existing;
         _name = existing?.Name ?? "";
         _values.Clear(); _replace.Clear(); _clear.Clear();
+        _connecting = false;
         foreach (var f in def.Fields.Where(f => !f.IsSecret))
             _values[f.Key] = existing is not null ? existing.Settings.GetValueOrDefault(f.Key, "") : f.Default ?? "";
         _view = View.Form;
     }
 
     private void SetValue(FieldDef f, object? v) => _values[f.Key] = v?.ToString() ?? string.Empty;
+
+    private static string FieldId(FieldDef f) => $"int-f-{f.Key}";
 
     private string Value(FieldDef f) => _values.GetValueOrDefault(f.Key, "");
 
@@ -179,6 +219,59 @@
         }
         return new IntegrationRequest(_def.Platform, _name, values);
     }
+
+    private async Task ConnectTrello()
+    {
+        _error = null;
+        if (string.IsNullOrEmpty(_trello.ClientId)) { _error = "DistillForge isn't set up for Trello yet (Trello__ClientId)."; return; }
+        _verifier = Pkce.NewVerifier();
+        _state = Pkce.NewState();
+        _redirect = Navigation.BaseUri + TrelloAuth.CallbackPage;
+        _connecting = true;
+        await JS.InvokeVoidAsync("distillforge.connectTrello",
+            TrelloAuth.AuthorizeUrl(_trello.ClientId, _redirect, _state, Pkce.Challenge(_verifier)), _self);
+    }
+
+    private async Task CancelConnect()
+    {
+        _connecting = false;
+        _verifier = ""; _state = "";
+        await JS.InvokeVoidAsync("distillforge.cancelTrello");
+    }
+
+    [JSInvokable]
+    public Task OnTrelloResult(string? code, string? state, string? error, string? reason) => InvokeAsync(async () =>
+    {
+        _connecting = false;
+        if (code is null)
+        {
+            _error = error is not null ? $"Trello didn't approve the connection: {error}"
+                : reason switch
+                {
+                    "blocked" => "Your browser blocked the pop-up. Allow pop-ups for this site and try again.",
+                    "invalid" => "Trello sent back something unexpected. Try again.",
+                    _ => $"The connection wasn't approved in time. If Trello's window showed an error about the redirect or callback, make sure {_redirect} is listed as a callback URL on the Trello OAuth client.",
+                };
+            StateHasChanged();
+            return;
+        }
+        if (state != _state)
+        {
+            _error = "The sign-in didn't match the one that was started, so it was ignored. Try again.";
+            StateHasChanged();
+            return;
+        }
+
+        var request = new TrelloConnectRequest(_name.Trim(), code, _verifier, _redirect, _editing?.Id);
+        _verifier = ""; _state = "";   // single use
+        await Run(async () =>
+        {
+            await Api.ConnectTrelloAsync(request, _cts.Token);
+            await Reload();
+            _view = View.List;
+        });
+        StateHasChanged();
+    });
 
     private async Task Save()
     {
@@ -207,9 +300,9 @@
     }
 
     /// <summary>The non-secret identifying fields, e.g. "me / repo".</summary>
-    private static string Summary(IntegrationDto c, PlatformDef def) =>
+    private static string Summary(IntegrationDto c, PlatformDef def) => def.UsesOAuth ? "Signed in with " + def.Name :
         string.Join(" · ", def.Fields.Where(f => !f.IsSecret && f.Required)
             .Select(f => c.Settings.GetValueOrDefault(f.Key)).Where(v => !string.IsNullOrEmpty(v)));
 
-    public void Dispose() { _cts.Cancel(); _cts.Dispose(); }
+    public void Dispose() { _cts.Cancel(); _cts.Dispose(); _self?.Dispose(); }
 }

@@ -109,6 +109,12 @@ public sealed class DistillForgeApi(HttpClient http)
 
     public Task DeleteIntegrationAsync(Guid id, CancellationToken ct = default) => Delete($"integrations/{id}", ct);
 
+    public async Task<TrelloConnectInfoDto> GetTrelloConnectInfoAsync(CancellationToken ct = default) =>
+        await Send<TrelloConnectInfoDto>(() => http.GetAsync("integrations/trello/connect-info", ct), ct) ?? new(false, null);
+
+    public async Task<IntegrationDto> ConnectTrelloAsync(TrelloConnectRequest r, CancellationToken ct = default) =>
+        (await Send<IntegrationDto>(() => http.PostAsJsonAsync("integrations/trello/connect", r, ct), ct))!;
+
     // ---- Pushing notes to integrations ----
 
     /// <summary>With no scope, also returns the scopes (projects) to choose from.</summary>

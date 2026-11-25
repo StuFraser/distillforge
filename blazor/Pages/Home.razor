@@ -202,7 +202,7 @@
                 <span class="tab-spacer"></span>
                 @if (ActiveCategory is not null)
                 {
-                    <button type="button" class="icon-button" title="Push this category to Azure DevOps…" aria-label="Push this category to an integration"
+                    <button type="button" class="icon-button" title="Push this category to a connected tool…" aria-label="Push this category to an integration"
                             disabled="@(InActive.All(a => a.MergedIntoId is not null))" @onclick="() => _pushOpen = true">⤴</button>
                     <button type="button" class="icon-button" title="Share this category by email" aria-label="Share this category by email"
                             @onclick="() => OpenShare(1 + _categories.IndexOf(ActiveCategory))">✉</button>

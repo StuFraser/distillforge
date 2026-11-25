@@ -34,12 +34,14 @@ public sealed record FieldDef(
     public bool IsSecret => Kind == FieldKind.Secret;
 }
 
+/// <param name="UsesOAuth">Connected by approving access in a pop-up rather than filling in fields; the server stores the resulting tokens.</param>
 public sealed record PlatformDef(
     IntegrationPlatform Platform,
     string Name,
     string Description,
     IReadOnlyList<FieldDef> Fields,
-    string? HelpUrl = null);
+    string? HelpUrl = null,
+    bool UsesOAuth = false);
 
 /// <summary>
 /// What each platform needs from the user. The Blazor form is generated from this and the API validates against it, so
@@ -58,12 +60,8 @@ public static class IntegrationCatalog
             new("labels", "Default labels", Required: false, Help: "Comma-separated; applied to every issue.", Placeholder: "distillforge, triage"),
         ], "https://github.com/settings/personal-access-tokens"),
 
-        new(IntegrationPlatform.Trello, "Trello", "Create a card on a list for each note.",
-        [
-            new("apiKey", "API key", FieldKind.Secret, Help: "From the Trello Power-Up admin page."),
-            new("token", "Token", FieldKind.Secret, Help: "Authorised with write access to your boards."),
-            new("listId", "List ID", Help: "The list new cards are added to.", Placeholder: "5f1c…"),
-        ], "https://trello.com/power-ups/admin"),
+        new(IntegrationPlatform.Trello, "Trello", "Create a card on a list for each note. The board and list are chosen each time you push.",
+            [], UsesOAuth: true),
 
         new(IntegrationPlatform.AzureDevOps, "Azure DevOps", "Create a work item in a project for each note.",
         [

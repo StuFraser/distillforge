@@ -24,6 +24,13 @@ public interface IExportTarget
     /// </summary>
     Task<PushOptionsDto> GetOptionsAsync(TargetConnection connection, string? scope, CancellationToken ct);
 
+    /// <summary>
+    /// For platforms whose credentials expire (OAuth): returns the full, renewed set of secrets to store, or null when the stored
+    /// ones are still good. Throws <see cref="ExportAuthException"/> when they can't be renewed and the user must reconnect.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, string>?> RefreshSecretsAsync(TargetConnection connection, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyDictionary<string, string>?>(null);
+
     /// <summary>Creates one item. A failure specific to this note returns Ok=false; a failure that would hit every note (bad token) throws <see cref="ExportAuthException"/>.</summary>
     Task<PushOutcome> PushAsync(TargetConnection connection, ExportItem item, PushChoices choices, CancellationToken ct);
 }

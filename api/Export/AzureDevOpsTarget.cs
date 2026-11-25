@@ -31,7 +31,7 @@ public sealed class AzureDevOpsTarget(IHttpClientFactory httpFactory) : IExportT
                 {
                     projects = [fallback];   // the token can't list projects (no Project and Team scope), but a default is saved
                 }
-                if (projects.Count == 0) return new([], null, "No projects were found in the organisation.", ScopeLabel);
+                if (projects.Count == 0) return new([], null, "No projects were found in the organisation.", ScopeLabel, HasAreaPath: true);
                 chosen = projects.Contains(fallback) ? fallback : projects[0];
             }
 
@@ -44,15 +44,18 @@ public sealed class AzureDevOpsTarget(IHttpClientFactory httpFactory) : IExportT
                 .Select(n => n!)
                 .Order(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            if (types.Count == 0) return new([], null, $"“{chosen}” has no work item types available.", ScopeLabel, projects, chosen);
-            return new(types, types.Contains("Task") ? "Task" : types[0], null, ScopeLabel, projects, chosen);
+            var scopes = projects?.Select(Same).ToList();
+            if (types.Count == 0) return new([], null, $"“{chosen}” has no work item types available.", ScopeLabel, scopes, chosen, HasAreaPath: true);
+            return new(types.Select(Same).ToList(), types.Contains("Task") ? "Task" : types[0], null, ScopeLabel, scopes, chosen, HasAreaPath: true);
         }
-        catch (ExportAuthException ex) { return new([], null, ex.Message, ScopeLabel); }
+        catch (ExportAuthException ex) { return new([], null, ex.Message, ScopeLabel, HasAreaPath: true); }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {
-            return new([], null, $"Couldn't reach Azure DevOps: {ex.Message}", ScopeLabel);
+            return new([], null, $"Couldn't reach Azure DevOps: {ex.Message}", ScopeLabel, HasAreaPath: true);
         }
     }
+
+    private static PushOption Same(string name) => new(name, name);
 
     private async Task<IReadOnlyList<string>> ListProjectsAsync(TargetConnection c, CancellationToken ct)
     {

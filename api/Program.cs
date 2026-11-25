@@ -48,6 +48,10 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpClient(AzureDevOpsTarget.HttpClientName)
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddSingleton<IExportTarget, AzureDevOpsTarget>();
+builder.Services.Configure<TrelloOptions>(builder.Configuration.GetSection(TrelloOptions.Section));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<TrelloOAuthClient>();
+builder.Services.AddSingleton<IExportTarget, TrelloTarget>();
 builder.Services.AddScoped<AiConfigResolver>();
 builder.Services.AddSingleton<ActionExtractorFactory>();
 

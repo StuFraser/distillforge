@@ -37,7 +37,8 @@ Key feature is that extracted notes can be linked back to relevant passages in s
 - Template: `api/local.settings.sample.json` (committed, no secrets).
 - Key settings: `ConnectionStrings__Postgres`, `AzureWebJobsStorage`,
   `AiProvider__BaseUrl` (include `/v1`), `AiProvider__Model`, `AiProvider__ApiKey`,
-  `AiProvider__ContextTokens`, `AiProvider__ReserveOutput`, `AiProvider__ResponseFormat`
+  `AiProvider__ContextTokens`, `AiProvider__ReserveOutput`, `AiProvider__ResponseFormat`,
+  `Trello__ClientId` (optional; the Trello Power-Up's OAuth 2.0 client id, enables Connect with Trello; `Trello__ClientSecret` only for a confidential client)
 
 ## Development Environment
 - PostgreSQL and Ollama run on separate machines on the local network.

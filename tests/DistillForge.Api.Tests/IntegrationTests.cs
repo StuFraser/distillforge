@@ -59,7 +59,7 @@ public class IntegrationTests : IDisposable
         await using var db = _db.NewContext();
         var fns = new IntegrationFunctions(db, Secrets());
 
-        var other = new IntegrationRequest(IntegrationPlatform.Trello, "A", new() { ["apiKey"] = "k", ["token"] = "t", ["listId"] = "l" });
+        var other = new IntegrationRequest(IntegrationPlatform.Trello, "A", new() { ["apiKey"] = "k", ["token"] = "t" });
         Assert.IsType<BadRequestObjectResult>(await fns.Update(Http.Json(other), a.Id, Ct));
         Assert.IsType<ConflictObjectResult>(await fns.Update(Http.Json(GitHub("b")), a.Id, Ct));
     }

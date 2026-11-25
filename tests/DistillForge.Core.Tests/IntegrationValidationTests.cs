@@ -29,11 +29,38 @@ public class IntegrationValidationTests
     [Fact] public void Clearing_a_required_secret_is_rejected() =>
         Assert.NotNull(IntegrationValidation.Validate(GitHub(v => v["token"] = ""), ["token"]));
 
-    [Fact] public void Optional_secret_may_be_absent()
+    [Fact] public void Trello_is_connected_by_signing_in_so_it_has_no_fields()
     {
-        var trello = new IntegrationRequest(IntegrationPlatform.Trello, "t",
-            new() { ["apiKey"] = "k", ["token"] = "t", ["listId"] = "l" });
-        Assert.Null(IntegrationValidation.Validate(trello));
+        var trello = IntegrationCatalog.Get(IntegrationPlatform.Trello);
+        Assert.True(trello.UsesOAuth);
+        Assert.Empty(trello.Fields);
+        Assert.Null(IntegrationValidation.Validate(new(IntegrationPlatform.Trello, "t", new())));       // e.g. a rename
+        Assert.NotNull(IntegrationValidation.Validate(new(IntegrationPlatform.Trello, "t", new() { ["token"] = "x" })));
+        Assert.All(IntegrationCatalog.All.Where(p => p.Platform != IntegrationPlatform.Trello), p => Assert.False(p.UsesOAuth));
+    }
+
+    [Fact] public void Trello_authorize_url_uses_the_code_flow_with_pkce_and_offline_access()
+    {
+        var url = TrelloAuth.AuthorizeUrl(" CLIENT ", "http://localhost:5189/trello-callback.html", "STATE", "CHALLENGE");
+        Assert.StartsWith("https://auth.atlassian.com/authorize?", url);
+        Assert.Contains("client_id=CLIENT&", url);
+        Assert.Contains("scope=read%3Aboard%3Atrello%20write%3Aboard%3Atrello%20offline_access", url);
+        Assert.Contains("redirect_uri=http%3A%2F%2Flocalhost%3A5189%2Ftrello-callback.html", url);
+        Assert.Contains("state=STATE", url);
+        Assert.Contains("response_type=code", url);
+        Assert.Contains("prompt=consent", url);
+        Assert.Contains("code_challenge=CHALLENGE", url);
+        Assert.Contains("code_challenge_method=S256", url);
+    }
+
+    [Fact] public void Pkce_matches_the_rfc_7636_example_and_generates_valid_random_values()
+    {
+        Assert.Equal("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", Pkce.Challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"));
+        var v = Pkce.NewVerifier();
+        Assert.InRange(v.Length, 43, 128);
+        Assert.Matches("^[A-Za-z0-9_-]+$", v);
+        Assert.NotEqual(v, Pkce.NewVerifier());
+        Assert.Matches("^[A-Za-z0-9_-]+$", Pkce.NewState());
     }
 
     [Fact] public void Url_fields_must_be_https()

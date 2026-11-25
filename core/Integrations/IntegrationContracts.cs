@@ -17,6 +17,18 @@ public sealed record IntegrationDto(
 /// </summary>
 public sealed record IntegrationRequest(IntegrationPlatform Platform, string Name, Dictionary<string, string?> Values);
 
+/// <summary>
+/// Whether this server is set up for "Connect with Trello" and, if so, its OAuth client id. The id is public by design
+/// (it appears in the authorize URL); a client secret, if there is one, never leaves the server.
+/// </summary>
+public sealed record TrelloConnectInfoDto(bool Configured, string? ClientId);
+
+/// <summary>
+/// Completes "Connect with Trello": the code Trello returned plus the PKCE verifier and redirect URI used to get it. The server
+/// swaps these for tokens and stores them. Set <see cref="IntegrationId"/> to reconnect an existing connection (new tokens, same name).
+/// </summary>
+public sealed record TrelloConnectRequest(string Name, string Code, string CodeVerifier, string RedirectUri, Guid? IntegrationId = null);
+
 public static class IntegrationValidation
 {
     public const int MaxName = 100, MaxValue = 500, MaxSecret = 2000;
