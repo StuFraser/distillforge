@@ -38,7 +38,7 @@ public class AzureDevOpsTargetTests
         new Dictionary<string, string> { ["organizationUrl"] = org, ["project"] = project },
         new Dictionary<string, string> { ["pat"] = "secret-pat" });
 
-    private static readonly ExportItem Item = new(Guid.NewGuid(), "  Send   the <b>budget</b> ", "Needs sign-off", "Sam", "Fri", "we must send it", "S2", "Finance; Q4", "Board <call>");
+    private static readonly ExportItem Item = new(Guid.NewGuid(), "  Send   the <b>budget</b> ", "Needs sign-off", "Sam", "Fri", "we must send it", "Finance; Q4", "Board <call>", "N-9F2M8X", "W-4K7Q2M", new DateTimeOffset(2026, 11, 25, 17, 51, 0, TimeSpan.Zero));
 
     private static PushChoices Choices(string type = "Task", string? scope = "My Project", string? area = null) => new(type, scope, area);
 
@@ -144,14 +144,17 @@ public class AzureDevOpsTargetTests
     }
 
     [Fact]
-    public void Description_is_html_encoded_and_includes_owner_due_and_source()
+    public void Description_is_html_encoded_and_includes_owner_due_quote_and_codes()
     {
         var html = AzureDevOpsTarget.BuildDescriptionHtml(Item);
         Assert.Contains("Needs sign-off", html);
         Assert.Contains("<b>Owner:</b> Sam", html);
         Assert.Contains("<b>Due:</b> Fri", html);
         Assert.Contains("“we must send it”", html);
-        Assert.Contains("Source: S2", html);
+        Assert.Contains("(25 Nov 2026)", html);
+        Assert.Contains("W-4K7Q2M", html);
+        Assert.Contains("N-9F2M8X", html);
+        Assert.DoesNotContain("Source:", html);
         Assert.Contains("Board &lt;call&gt;", html);
         Assert.DoesNotContain("<call>", html);
     }

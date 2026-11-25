@@ -67,6 +67,7 @@ public sealed class ActionItemFunctions(DistillForgeDbContext db)
             Id = Guid.NewGuid(),
             WorkspaceId = id,
             CategoryId = body.CategoryId,
+            Code = (await CodeAllocator.NewNoteCodesAsync(db, 1, ct)).Dequeue(),
             Title = body.Title.Trim(),
             Summary = Blank(body.Summary),
             Owner = Blank(body.Owner),

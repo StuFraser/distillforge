@@ -199,7 +199,7 @@ public class CrossUserTests : IDisposable
     {
         await using (var db = _db.NewContext())
         {
-            db.Workspaces.Add(new Workspace { Id = Guid.NewGuid(), OwnerId = TestDb.UserA, Title = "x", SourceText = "x", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow });
+            db.Workspaces.Add(new Workspace { Id = Guid.NewGuid(), OwnerId = TestDb.UserA, Title = "x", Code = DistillForge.Core.Codes.ShortCode.New(), SourceText = "x", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow });
             await db.SaveChangesAsync();
             await db.Database.ExecuteSqlRawAsync("UPDATE Workspaces SET OwnerId = NULL");
         }

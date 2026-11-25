@@ -198,7 +198,7 @@ public class UserProvisionerTests : IDisposable
         Guid orphanWorkspace;
         await using (var seed = _db.NewContext())
         {
-            var w = new Workspace { Id = Guid.NewGuid(), OwnerId = TestDb.UserA, Title = "old", SourceText = "old", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+            var w = new Workspace { Id = Guid.NewGuid(), OwnerId = TestDb.UserA, Title = "old", Code = DistillForge.Core.Codes.ShortCode.New(), SourceText = "old", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
             seed.Workspaces.Add(w);
             seed.AiProviders.Add(new AiProvider { Id = Guid.NewGuid(), OwnerId = TestDb.UserA, Name = "p", BaseUrl = "http://x/v1" });
             await seed.SaveChangesAsync();

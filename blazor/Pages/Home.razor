@@ -26,7 +26,7 @@
                 }
                 @foreach (var w in _list)
                 {
-                    <option value="@w.Id" selected="@(w.Id == _workspace?.Id)">@(w.IsArchived ? "📦 " : "")@w.Title (@w.ActionItemCount) · @w.UpdatedAt.ToLocalTime().ToString("d MMM HH:mm")</option>
+                    <option value="@w.Id" selected="@(w.Id == _workspace?.Id)">@(w.IsArchived ? "📦 " : "")@w.Title (@w.ActionItemCount) · @w.UpdatedAt.ToLocalTime().ToString("d MMM HH:mm") · @w.Code</option>
                 }
             </select>
             <button type="button" class="secondary" @onclick="OpenNew" disabled="@(IsExtracting || _saving)" title="Start a new workspace">+ New</button>
@@ -37,13 +37,31 @@
                     @(_workspace.IsArchived ? "Unarchive" : "Archive")
                 </button>
             }
+            <form class="lookup" @onsubmit="DoLookup">
+                <input type="search" aria-label="Go to a workspace or note by code" placeholder="Go to W-… or N-…" maxlength="12" size="14"
+                       @bind="_lookupText" @bind:event="oninput" disabled="@(IsExtracting || _saving)" />
+            </form>
             <label class="show-archived">
                 <input type="checkbox" checked="@_showArchived" @onchange="OnShowArchivedChanged" /> Show archived
             </label>
         </div>
         <header class="panel-header">
-            <h2>@(_workspace?.Title ?? "Source")</h2>
-            @if (_workspace is not null)
+            @if (_renaming && _workspace is not null)
+            {
+                <input class="rename-input" aria-label="Workspace name" maxlength="200" @bind="_renameText" @bind:event="oninput" @onkeydown="OnRenameKey" />
+                <button type="button" class="primary small" @onclick="SaveRename" disabled="@(_saving || string.IsNullOrWhiteSpace(_renameText))">Save</button>
+                <button type="button" class="secondary small" @onclick="() => _renaming = false" disabled="@_saving">Cancel</button>
+            }
+            else
+            {
+                <h2>@(_workspace?.Title ?? "Source")</h2>
+                @if (_workspace is not null)
+                {
+                    <button type="button" class="link" @onclick="StartRename" disabled="@(IsExtracting || _saving)" title="Rename this workspace">Rename</button>
+                    <span class="code-chip" title="Short code. Type it in the Go to box to open this workspace again.">@_workspace.Code</span>
+                }
+            }
+            @if (_workspace is not null && !_renaming)
             {
                 <span class="muted">@(_workspace.IsArchived ? "Archived · " : "")@_workspace.Strategy · @_workspace.Segments.Count segments</span>
             }
@@ -755,6 +773,60 @@
         if (IsExtracting) _ = ResumePolling();
     }
 
+    private bool _renaming;
+    private string _renameText = "";
+    private string _lookupText = "";
+
+    private void StartRename() { _renameText = _workspace?.Title ?? ""; _renaming = true; }
+
+    private async Task OnRenameKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SaveRename();
+        else if (e.Key == "Escape") _renaming = false;
+    }
+
+    private async Task SaveRename()
+    {
+        if (_workspace is null || string.IsNullOrWhiteSpace(_renameText)) return;
+        _saving = true;
+        try
+        {
+            _workspace = await Api.RenameWorkspaceAsync(_workspace.Id, _renameText, _cts.Token);
+            _renaming = false;
+            await RefreshList();
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    /// <summary>Opens the workspace a W-… code names, or the workspace and note an N-… code names.</summary>
+    private async Task DoLookup()
+    {
+        var code = _lookupText.Trim();
+        if (code.Length == 0) return;
+        try
+        {
+            var hit = await Api.LookupAsync(code, _cts.Token);
+            if (hit is null) { _error = $"Nothing of yours matches {code.ToUpperInvariant()}."; return; }
+
+            if (hit.WorkspaceId != _workspace?.Id)
+            {
+                await LoadWorkspace(hit.WorkspaceId);
+                // An archived workspace isn't in the picker unless archived ones are shown.
+                if (_workspace?.IsArchived == true && !_showArchived) _showArchived = true;
+                await RefreshList();
+            }
+            if (hit.NoteId is Guid nid && _workspace is not null)
+            {
+                var note = _actions.FirstOrDefault(a => a.Id == nid) ?? _merged.FirstOrDefault(a => a.Id == nid);
+                if (note is not null) OpenItem(note);
+            }
+            _lookupText = "";
+            _error = null;
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
     private async Task OnWorkspaceChosen(ChangeEventArgs e)
     {
         if (!Guid.TryParse(e.Value?.ToString(), out var id) || id == _workspace?.Id) return;
@@ -814,14 +886,14 @@
 
     private void OpenReplace() { _replacing = true; _showDialog = true; }
 
-    private async Task SubmitSource((string Text, SegmentationStrategyKind? Strategy, Guid? ModelId) input)
+    private async Task SubmitSource((string Text, SegmentationStrategyKind? Strategy, Guid? ModelId, string? Title) input)
     {
         _chosenModelId = input.ModelId;
         _saving = true;
         try
         {
             _workspace = !_replacing || _workspace is null
-                ? await Api.CreateWorkspaceAsync(new CreateWorkspaceRequest(input.Text, null, input.Strategy), _cts.Token)
+                ? await Api.CreateWorkspaceAsync(new CreateWorkspaceRequest(input.Text, input.Title, input.Strategy), _cts.Token)
                 : await Api.ReplaceSourceAsync(_workspace.Id, new ReplaceSourceRequest(input.Text, input.Strategy), _cts.Token);
             _actions = [];
             _merged = [];

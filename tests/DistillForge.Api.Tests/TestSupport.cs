@@ -59,7 +59,7 @@ public sealed class TestDb : IDisposable
         {
             Id = Guid.NewGuid(),
             OwnerId = owner ?? UserA,
-            Title = "Test",
+            Title = "Test", Code = DistillForge.Core.Codes.ShortCode.New(),
             SourceText = "AAAAAAAAAA\n\nBBBBBBBBBB\n\nCCCCCCCCCC",
             Strategy = SegmentationStrategyKind.Prose,
             IsArchived = archived,
@@ -88,7 +88,7 @@ public sealed class TestDb : IDisposable
         using var db = NewContext();
         var n = new ActionItem
         {
-            Id = Guid.NewGuid(), WorkspaceId = workspaceId, Title = title, SortOrder = sortOrder, CategoryId = categoryId,
+            Id = Guid.NewGuid(), WorkspaceId = workspaceId, Title = title, Code = DistillForge.Core.Codes.ShortCode.New(), SortOrder = sortOrder, CategoryId = categoryId,
             MergedIntoId = mergedIntoId, IsManual = manual, CreatedAt = DateTimeOffset.UtcNow,
         };
         if (evidenceSegmentId is Guid seg)

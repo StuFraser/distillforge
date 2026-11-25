@@ -118,9 +118,8 @@ public sealed class AzureDevOpsTarget(IHttpClientFactory httpFactory) : IExportT
         if (!string.IsNullOrWhiteSpace(item.SourceQuote))
         {
             sb.Append("<blockquote>“").Append(E(Clip(Collapse(item.SourceQuote), MaxQuote))).Append("”</blockquote>");
-            if (!string.IsNullOrWhiteSpace(item.SourceLabel)) sb.Append("<p><i>Source: ").Append(E(item.SourceLabel)).Append("</i></p>");
         }
-        sb.Append("<hr><p><i>Created by DistillForge from “").Append(E(item.WorkspaceTitle)).Append("”.</i></p>");
+        sb.Append("<hr><p><i>").Append(E(Collapse(item.Provenance()))).Append("</i></p>");
         return sb.ToString();
     }
 

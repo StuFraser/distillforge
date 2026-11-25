@@ -4,6 +4,11 @@ using DistillForge.Core.Segmentation;
 
 namespace DistillForge.Core.Contracts;
 
+public sealed record RenameWorkspaceRequest(string Title);
+
+/// <summary>Where a short code points: a workspace, or a note inside one (NoteId set).</summary>
+public sealed record LookupResultDto(Guid WorkspaceId, Guid? NoteId);
+
 public sealed record CreateWorkspaceRequest(string SourceText, string? Title = null, SegmentationStrategyKind? Strategy = null);
 
 public sealed record ReplaceSourceRequest(string SourceText, SegmentationStrategyKind? Strategy = null);
@@ -17,7 +22,8 @@ public sealed record WorkspaceSummaryDto(
     bool IsArchived,
     int ActionItemCount,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string Code = "");
 
 public sealed record WorkspaceDto(
     Guid Id,
@@ -26,7 +32,8 @@ public sealed record WorkspaceDto(
     SegmentationStrategyKind Strategy,
     bool IsArchived,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<SegmentDto> Segments);
+    IReadOnlyList<SegmentDto> Segments,
+    string Code = "");
 
 public sealed record SegmentDto(Guid Id, string Label, int Start, int End);
 
@@ -42,7 +49,8 @@ public sealed record ActionItemDto(
     IReadOnlyList<EvidenceDto> Evidence,
     string? Colour = null,
     Guid? MergedIntoId = null,
-    IReadOnlyList<Guid>? PossibleDuplicateIds = null);
+    IReadOnlyList<Guid>? PossibleDuplicateIds = null,
+    string Code = "");
 
 public sealed record EvidenceDto(string SegmentLabel, string Quote, int Start, int End, MatchQuality MatchQuality);
 

@@ -116,7 +116,7 @@ public class TrelloTargetTests
         ["accessToken"] = "AT/1", ["refreshToken"] = "RT1", ["expiresAt"] = (expires ?? TrelloFakes.Now.AddHours(1)).ToString("O"),
     });
 
-    private static readonly ExportItem Item = new(Guid.NewGuid(), "  Send   budget ", "Needs sign-off", "Sam", "Fri", "we must send it", "S2", "Finance", "Board call");
+    private static readonly ExportItem Item = new(Guid.NewGuid(), "  Send   budget ", "Needs sign-off", "Sam", "Fri", "we must send it", "Finance", "Board call", "N-9F2M8X", "W-4K7Q2M", new DateTimeOffset(2026, 11, 25, 17, 51, 0, TimeSpan.Zero));
     private static PushChoices Choices(string list = ListA) => new(list, Board1, null);
 
     private static HttpResponseMessage Route(HttpRequestMessage r) =>
@@ -179,7 +179,8 @@ public class TrelloTargetTests
         Assert.Contains("**Owner:** Sam", form["desc"]);
         Assert.Contains("**Category:** Finance", form["desc"]);
         Assert.Contains("> “we must send it”", form["desc"]);
-        Assert.Contains("_Source: S2_", form["desc"]);
+        Assert.Contains("_Created by DistillForge from “Board call” (25 Nov 2026) · W-4K7Q2M · N-9F2M8X._", form["desc"]);
+        Assert.DoesNotContain("Source:", form["desc"]);
     }
 
     [Fact]

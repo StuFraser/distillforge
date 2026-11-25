@@ -1,3 +1,4 @@
+using DistillForge.Core.Codes;
 using DistillForge.Core.Integrations;
 using DistillForge.Core.Contracts;
 using DistillForge.Data.Entities;
@@ -9,17 +10,18 @@ public static class Mapping
 {
     public static WorkspaceDto ToDto(this Workspace w) => new(
         w.Id, w.Title, w.SourceText, w.Strategy, w.IsArchived, w.CreatedAt,
-        w.Segments.OrderBy(s => s.Ordinal).Select(s => new SegmentDto(s.Id, s.Label, s.Start, s.End)).ToList());
+        w.Segments.OrderBy(s => s.Ordinal).Select(s => new SegmentDto(s.Id, s.Label, s.Start, s.End)).ToList(),
+        ShortCode.ForWorkspace(w.Code));
 
     public static WorkspaceSummaryDto ToSummaryDto(this Workspace w, int actionItemCount) =>
-        new(w.Id, w.Title, w.IsArchived, actionItemCount, w.CreatedAt, w.UpdatedAt);
+        new(w.Id, w.Title, w.IsArchived, actionItemCount, w.CreatedAt, w.UpdatedAt, ShortCode.ForWorkspace(w.Code));
 
     public static ActionItemDto ToDto(this ActionItem a, IReadOnlyList<Guid>? possibleDuplicates = null) => new(
         a.Id, a.Title, a.Summary, a.Owner, a.Due, a.CategoryId, a.IsManual, a.SortOrder,
         a.Evidence.OrderBy(e => e.Start)
             .Select(e => new EvidenceDto(e.Segment?.Label ?? "", e.Quote, e.Start, e.End, e.MatchQuality))
             .ToList(),
-        a.Colour, a.MergedIntoId, possibleDuplicates ?? []);
+        a.Colour, a.MergedIntoId, possibleDuplicates ?? [], ShortCode.ForNote(a.Code));
 
     public static AiModelDto ToDto(this AiModel m) => new(
         m.Id, m.AiProviderId, m.ModelId, m.DisplayName, m.ContextTokens, m.ReserveOutput, m.ResponseFormat, m.IsDefault, m.Thinking);

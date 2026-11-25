@@ -1,6 +1,8 @@
 <div class="dialog-backdrop" @onclick="BackdropClick">
     <div class="dialog item-dialog" role="dialog" aria-modal="true" aria-labelledby="item-title" @onclick:stopPropagation="true">
-        <h2 id="item-title">@(IsNew ? "New action item" : ReadOnly ? "Action item (read-only)" : "Action item")</h2>
+        <h2 id="item-title">@(IsNew ? "New action item" : ReadOnly ? "Action item (read-only)" : "Action item")
+            @if (!IsNew && !string.IsNullOrEmpty(Item?.Code)) { <span class="code-chip" title="Short code. Type it in the Go to box to find this note again.">@Item.Code</span> }
+        </h2>
 
         @if (Error is not null)
         {

@@ -104,9 +104,9 @@ public sealed partial class TrelloTarget(
         if (!string.IsNullOrWhiteSpace(item.SourceQuote))
         {
             var quote = "> “" + Clip(Collapse(item.SourceQuote), AzureDevOpsTarget.MaxQuote) + "”";
-            parts.Add(string.IsNullOrWhiteSpace(item.SourceLabel) ? quote : quote + "\n> \n> _Source: " + Collapse(item.SourceLabel) + "_");
+            parts.Add(quote);
         }
-        parts.Add("---\n_Created by DistillForge from “" + Collapse(item.WorkspaceTitle) + "”._");
+        parts.Add("---\n_" + Collapse(item.Provenance()) + "_");
         return string.Join("\n\n", parts);
     }
 

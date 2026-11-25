@@ -21,7 +21,8 @@ public sealed class WorkspaceService(DistillForgeDbContext db)
         var workspace = new Workspace
         {
             Id = Guid.CreateVersion7(),
-            Title = string.IsNullOrWhiteSpace(title) ? DefaultTitle(source) : title.Trim(),
+            Title = string.IsNullOrWhiteSpace(title) ? DefaultTitle(source) : ClipTitle(title),
+            Code = await CodeAllocator.NewWorkspaceCodeAsync(db, ct),
             SourceText = source,
             CreatedAt = now,
             UpdatedAt = now,
@@ -59,6 +60,24 @@ public sealed class WorkspaceService(DistillForgeDbContext db)
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        return workspace;
+    }
+
+    public const int MaxTitleChars = 200;
+
+    private static string ClipTitle(string title)
+    {
+        var t = string.Join(' ', title.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return t.Length <= MaxTitleChars ? t : t[..MaxTitleChars];
+    }
+
+    public async Task<Workspace?> RenameAsync(Guid id, string title, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(title)) throw new SourceValidationException("The name can't be empty.");
+        var workspace = await db.Workspaces.Include(w => w.Segments).FirstOrDefaultAsync(w => w.Id == id, ct);
+        if (workspace is null) return null;
+        workspace.Title = ClipTitle(title);
+        await db.SaveChangesAsync(ct);
         return workspace;
     }
 

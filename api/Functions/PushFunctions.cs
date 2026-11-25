@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DistillForge.Api.Export;
+using DistillForge.Core.Codes;
 using DistillForge.Core.Export;
 using DistillForge.Data;
 using DistillForge.Data.Entities;
@@ -66,7 +67,7 @@ public sealed class PushFunctions(DistillForgeDbContext db, SecretProtector secr
 
             try
             {
-                var outcome = await resolved.Target!.PushAsync(resolved.Connection!, ToItem(note, workspace.Title, body.IncludeSource), choices, ct);
+                var outcome = await resolved.Target!.PushAsync(resolved.Connection!, ToItem(note, workspace, body.IncludeSource), choices, ct);
                 outcomes.Add(outcome);
                 if (outcome.Ok)
                     db.NotePushes.Add(new NotePush
@@ -98,10 +99,11 @@ public sealed class PushFunctions(DistillForgeDbContext db, SecretProtector secr
 
     private static PushOutcome Fail(Guid noteId, string error) => new(noteId, false, null, null, error);
 
-    private static ExportItem ToItem(ActionItem n, string workspaceTitle, bool includeSource)
+    private static ExportItem ToItem(ActionItem n, Workspace workspace, bool includeSource)
     {
         var first = includeSource ? n.Evidence.OrderBy(e => e.Segment?.Ordinal ?? int.MaxValue).ThenBy(e => e.Start).FirstOrDefault() : null;
-        return new(n.Id, n.Title, n.Summary, n.Owner, n.Due, first?.Quote, first?.Segment?.Label, n.Category?.Name, workspaceTitle);
+        return new(n.Id, n.Title, n.Summary, n.Owner, n.Due, first?.Quote, n.Category?.Name, workspace.Title,
+            ShortCode.ForNote(n.Code), ShortCode.ForWorkspace(workspace.Code), workspace.CreatedAt);
     }
 
     private sealed record Resolved(IExportTarget? Target, TargetConnection? Connection, IActionResult? Error);

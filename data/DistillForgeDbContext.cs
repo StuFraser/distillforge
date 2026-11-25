@@ -78,6 +78,8 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
         b.Entity<Workspace>(e =>
         {
             e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Code).HasMaxLength(8);
+            e.HasIndex(x => x.Code).IsUnique();
             e.Property(x => x.Strategy).HasConversion<string>().HasMaxLength(32);
             e.HasIndex(x => x.IsArchived);
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
@@ -102,6 +104,8 @@ public class DistillForgeDbContext(DbContextOptions<DistillForgeDbContext> optio
         b.Entity<ActionItem>(e =>
         {
             e.Property(x => x.Title).HasMaxLength(300);
+            e.Property(x => x.Code).HasMaxLength(8);
+            e.HasIndex(x => x.Code).IsUnique();
             e.Property(x => x.Owner).HasMaxLength(200);
             e.Property(x => x.Due).HasMaxLength(100);
             e.Property(x => x.Colour).HasMaxLength(16);

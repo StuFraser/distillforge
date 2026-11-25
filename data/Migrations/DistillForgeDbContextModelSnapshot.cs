@@ -32,6 +32,11 @@ namespace DistillForge.Data.Migrations
                     b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
                     b.Property<string>("Colour")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
@@ -73,6 +78,9 @@ namespace DistillForge.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
 
                     b.HasIndex("MergedIntoId");
 
@@ -523,6 +531,11 @@ namespace DistillForge.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -550,6 +563,9 @@ namespace DistillForge.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
 
                     b.HasIndex("IsArchived");
 

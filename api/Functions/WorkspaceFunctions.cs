@@ -1,4 +1,5 @@
 using DistillForge.Api.Services;
+using DistillForge.Core.Codes;
 using DistillForge.Core.Contracts;
 using DistillForge.Data;
 using Microsoft.AspNetCore.Http;
@@ -98,6 +99,45 @@ public sealed class WorkspaceFunctions(DistillForgeDbContext db, WorkspaceServic
         {
             return new BadRequestObjectResult(ex.Message);
         }
+    }
+
+    [Function("RenameWorkspace")]
+    public async Task<IActionResult> Rename(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "workspaces/{id:guid}/title")] HttpRequest req,
+        Guid id,
+        CancellationToken ct)
+    {
+        var body = await ReadBody<RenameWorkspaceRequest>(req, ct);
+        if (body is null) return new BadRequestObjectResult("Expected JSON body with title.");
+        try
+        {
+            var w = await workspaces.RenameAsync(id, body.Title, ct);
+            return w is null ? new NotFoundResult() : new OkObjectResult(w.ToDto());
+        }
+        catch (SourceValidationException ex)
+        {
+            return new BadRequestObjectResult(ex.Message);
+        }
+    }
+
+    /// <summary>Resolves a typed or pasted short code (W-… / N-…) to the workspace, and note, it names. Scoped to the signed-in user by the query filters.</summary>
+    [Function("LookupCode")]
+    public async Task<IActionResult> Lookup(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "lookup/{code}")] HttpRequest req,
+        string code,
+        CancellationToken ct)
+    {
+        if (!ShortCode.TryParse(code, out var kind, out var bare))
+            return new BadRequestObjectResult("That isn't a DistillForge code. Codes look like W-4K7Q2M (workspace) or N-9F2M8X (note).");
+
+        if (kind == ShortCodeKind.Workspace)
+        {
+            var wid = await db.Workspaces.AsNoTracking().Where(w => w.Code == bare).Select(w => (Guid?)w.Id).FirstOrDefaultAsync(ct);
+            return wid is { } w ? new OkObjectResult(new LookupResultDto(w, null)) : new NotFoundResult();
+        }
+
+        var note = await db.ActionItems.AsNoTracking().Where(a => a.Code == bare).Select(a => new { a.Id, a.WorkspaceId }).FirstOrDefaultAsync(ct);
+        return note is null ? new NotFoundResult() : new OkObjectResult(new LookupResultDto(note.WorkspaceId, note.Id));
     }
 
     [Function("ArchiveWorkspace")]

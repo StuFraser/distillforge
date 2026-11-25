@@ -15,6 +15,8 @@ public class Workspace
     /// <summary>The signed-in user who owns this workspace. Stamped on save; null only on rows that pre-date auth (invisible to everyone until claimed).</summary>
     public Guid? OwnerId { get; set; }
     public required string Title { get; set; }
+    /// <summary>Short lookup code (bare; shown as W-xxxxxx). Assigned at creation, never changes, unique.</summary>
+    public required string Code { get; set; }
     public required string SourceText { get; set; }
     public SegmentationStrategyKind Strategy { get; set; }
     public bool IsArchived { get; set; }
@@ -61,6 +63,8 @@ public class ActionItem
     /// <summary>Set when this note was merged into another (its parent). Merged notes stay as full records, are hidden in the UI and follow the parent's category.</summary>
     public Guid? MergedIntoId { get; set; }
     public required string Title { get; set; }
+    /// <summary>Short lookup code (bare; shown as N-xxxxxx). Assigned at creation, never changes, unique.</summary>
+    public required string Code { get; set; }
     public string? Summary { get; set; }
     public string? Owner { get; set; }
     public string? Due { get; set; }

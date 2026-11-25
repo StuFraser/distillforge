@@ -15,6 +15,12 @@
             </p>
         }
 
+        @if (!IsReplace)
+        {
+            <label for="source-name">Name <span class="muted">(optional; you can rename it later)</span></label>
+            <input id="source-name" type="text" maxlength="200" @bind="_title" @bind:event="oninput" placeholder="Defaults to the first line of the document" />
+        }
+
         <label for="source-input">Paste text</label>
         <textarea id="source-input" rows="16" @bind="_text" @bind:event="oninput" placeholder="Paste a meeting transcript, plan, contract…"></textarea>
 
@@ -61,12 +67,13 @@
 @code {
     [Parameter] public bool IsReplace { get; set; }
     [Parameter] public bool Busy { get; set; }
-    [Parameter] public EventCallback<(string Text, SegmentationStrategyKind? Strategy, Guid? ModelId)> OnSubmit { get; set; }
+    [Parameter] public EventCallback<(string Text, SegmentationStrategyKind? Strategy, Guid? ModelId, string? Title)> OnSubmit { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public IReadOnlyList<AiModelChoiceDto> Models { get; set; } = [];
     [Parameter] public Guid? ModelId { get; set; }
 
     private string _text = "";
+    private string _title = "";
     private string _strategy = "";
     private string _model = "";
     private string? _fileName;
@@ -123,7 +130,7 @@
     private Task Submit()
     {
         SegmentationStrategyKind? strategy = Enum.TryParse<SegmentationStrategyKind>(_strategy, out var s) ? s : null;
-        return OnSubmit.InvokeAsync((_text, strategy, Guid.TryParse(_model, out var m) ? m : null));
+        return OnSubmit.InvokeAsync((_text, strategy, Guid.TryParse(_model, out var m) ? m : null, IsReplace || string.IsNullOrWhiteSpace(_title) ? null : _title.Trim()));
     }
 
     private Task Cancel() => Busy ? Task.CompletedTask : OnCancel.InvokeAsync();

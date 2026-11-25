@@ -98,6 +98,7 @@ public sealed class ExtractionRunner(
             var now = DateTimeOffset.UtcNow;
             int order = 0;
             var itemIds = new Dictionary<ValidatedActionPoint, Guid>(ReferenceEqualityComparer.Instance);
+            var codes = await CodeAllocator.NewNoteCodesAsync(db, merged.Count, ct);
             foreach (var ap in merged)
             {
                 var itemId = Guid.CreateVersion7();
@@ -107,6 +108,7 @@ public sealed class ExtractionRunner(
                     Id = itemId,
                     WorkspaceId = workspace.Id,
                     ExtractionRunId = run.Id,
+                    Code = codes.Dequeue(),
                     Title = Clip(ap.Title, 300)!,
                     Summary = ap.Summary,
                     Owner = Clip(ap.Owner, 200),

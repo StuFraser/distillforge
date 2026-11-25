@@ -5,7 +5,21 @@ namespace DistillForge.Core.Export;
 /// <summary>One note as an export target sees it. Built on the server from the stored note, never taken from the client.</summary>
 public sealed record ExportItem(
     Guid NoteId, string Title, string? Summary, string? Owner, string? Due,
-    string? SourceQuote, string? SourceLabel, string? CategoryName, string WorkspaceTitle);
+    string? SourceQuote, string? CategoryName, string WorkspaceTitle,
+    string? NoteCode = null, string? WorkspaceCode = null, DateTimeOffset? WorkspaceDate = null)
+{
+    /// <summary>
+    /// The footer every platform shows, so a card or work item can be traced back: <c>Created by DistillForge from “Name” (25 Nov 2026) · W-… · N-…</c>.
+    /// Plain text; each target escapes it for its own format.
+    /// </summary>
+    public string Provenance()
+    {
+        var text = "Created by DistillForge from “" + WorkspaceTitle + "”";
+        if (WorkspaceDate is { } d) text += " (" + d.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture) + ")";
+        var codes = new[] { WorkspaceCode, NoteCode }.Where(c => !string.IsNullOrWhiteSpace(c));
+        return string.Join(" · ", new[] { text }.Concat(codes)) + ".";
+    }
+}
 
 /// <summary>What happened to one note in a push. Ok=false carries a message the user can act on.</summary>
 public sealed record PushOutcome(Guid NoteId, bool Ok, string? ExternalId, string? Url, string? Error);

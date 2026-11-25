@@ -29,6 +29,13 @@ public sealed class DistillForgeApi(HttpClient http)
     public async Task<WorkspaceDto> CreateWorkspaceAsync(CreateWorkspaceRequest request, CancellationToken ct = default) =>
         (await Send<WorkspaceDto>(() => http.PostAsJsonAsync("workspaces", request, ct), ct))!;
 
+    public async Task<WorkspaceDto> RenameWorkspaceAsync(Guid id, string title, CancellationToken ct = default) =>
+        (await Send<WorkspaceDto>(() => http.PutAsJsonAsync($"workspaces/{id}/title", new RenameWorkspaceRequest(title), ct), ct))!;
+
+    /// <summary>Resolves a W-… / N-… code; null when nothing of the signed-in user's matches.</summary>
+    public Task<LookupResultDto?> LookupAsync(string code, CancellationToken ct = default) =>
+        Send<LookupResultDto>(() => http.GetAsync($"lookup/{Uri.EscapeDataString(code.Trim())}", ct), ct);
+
     public async Task<WorkspaceDto> ReplaceSourceAsync(Guid id, ReplaceSourceRequest request, CancellationToken ct = default) =>
         (await Send<WorkspaceDto>(() => http.PutAsJsonAsync($"workspaces/{id}/source", request, ct), ct))!;
 

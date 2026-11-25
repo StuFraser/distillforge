@@ -383,3 +383,10 @@ span.button.primary.disabled { opacity: 0.55; cursor: not-allowed; }
 .connect-box { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .connect-box p { flex-basis: 100%; margin: 0; }
 .ok-text { color: var(--ok); font-size: 0.9rem; }
+
+.code-chip { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.75rem; padding: 1px 6px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted, #5b6573); background: #fafbfc; white-space: nowrap; user-select: all; }
+h2 .code-chip { margin-left: 8px; vertical-align: middle; font-weight: 400; }
+.lookup { margin: 0; }
+.lookup input { font: inherit; font-size: 0.85rem; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 8px; width: 11em; }
+.rename-input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 0.95rem; font-weight: 600; padding: 3px 6px; border: 1px solid var(--border-strong); border-radius: 6px; }
+.panel-header .small { padding: 3px 10px; font-size: 0.82rem; }
