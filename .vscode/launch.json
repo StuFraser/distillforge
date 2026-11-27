@@ -15,7 +15,7 @@
       "request": "launch",
       "cwd": "${workspaceFolder}/blazor",
       "url": "http://localhost:5189",
-      "browser": "chrome",
+      "browser": "edge",
       "preLaunchTask": "wait for api"
     }
   ],

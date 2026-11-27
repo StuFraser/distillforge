@@ -2,5 +2,6 @@
   "azureFunctions.projectSubpath": "api",
   "azureFunctions.projectLanguage": "C#",
   "azureFunctions.projectRuntime": "~4",
-  "debug.internalConsoleOptions": "neverOpen"
+  "debug.internalConsoleOptions": "neverOpen",
+  "dotnet.defaultSolution": "DistillForge.slnx"
 }
